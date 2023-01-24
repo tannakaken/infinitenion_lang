@@ -1,5 +1,5 @@
 import { isRational, Rational } from "./rational";
-import { addBase, Base, inverseBase, mulBase, negateBase } from "./base";
+import { addBase, Base, baseToString, inverseBase, mulBase, negateBase } from "./base";
 import { Integer, NonNegativeInteger } from "./integer";
 
 /**
@@ -242,4 +242,22 @@ const simplifyCayleyDickson = (a: CayleyDickson): Infinitenion => {
         return a.real;
     }
     return a;
+}
+
+export const infinitenionToString = (a: Infinitenion, nth = 0): string => {
+    if (isBase(a)) {
+        if (nth === 0) {
+            return baseToString(a);
+        }
+        if (a === 1) {
+            return `${nth} i`;
+        }
+        return `${baseToString(a)} ${nth} i *`;
+    }
+    const offset = Math.pow(2, a.height - 1);
+    if (a.real === 0) {
+        return infinitenionToString(a.image, nth + offset);
+    }
+    return `${infinitenionToString(a.real, nth)} ${infinitenionToString(a.image, nth + offset)} +`
+    
 }

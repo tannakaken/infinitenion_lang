@@ -1,5 +1,5 @@
 import { Integer, isInteger } from "./integer";
-import { addRational, addRationalInteger, invRational, isRational, mulRational, mulRationalInteger, negateRational, Rational } from "./rational";
+import { addRational, addRationalInteger, invRational, isRational, mulRational, mulRationalInteger, negateRational, Rational, rationalToString } from "./rational";
 
 /**
  * ケーリーディクソン構成の規定型
@@ -90,4 +90,11 @@ export const inverseBase = (a: Base): Base | null => {
         return 1/a;
     }
     return invRational(a);
+}
+
+export const baseToString = (a: Base): string => {
+    if (typeof a === "number") {
+        return a.toString(10);
+    }
+    return rationalToString(a);
 }

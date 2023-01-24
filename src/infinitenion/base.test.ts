@@ -1,4 +1,4 @@
-import { addBase, inverseBase, mulBase, negateBase } from "./base";
+import { addBase, baseToString, inverseBase, mulBase, negateBase } from "./base";
 import { Integer } from "./integer";
 import { makeRational, Rational } from "./rational";
 
@@ -53,4 +53,10 @@ test("inverse base", () => {
         denominator: 2
     });
     expect(inverseBase(1.5)).toBe(2/3);
+});
+
+test("base to string", () => {
+    expect(baseToString(0)).toBe("0");
+    expect(baseToString(1.5)).toBe("1.5");
+    expect(baseToString(makeRational(2 as Integer, 3 as Integer) as Rational)).toBe("2 3 /");
 });

@@ -1,4 +1,4 @@
-import { addInfinitenion, divInfinitenion, heightInfinitenion, imageOfInfinitenion, invInfinitenion, mulInfinitenion, negInfinitenion, nthImaginary, powInfinitenion, realOfInfinitenion, subInfinitenion } from "./infinitenion"
+import { addInfinitenion, divInfinitenion, heightInfinitenion, imageOfInfinitenion, infinitenionToString, invInfinitenion, mulInfinitenion, negInfinitenion, nthImaginary, powInfinitenion, realOfInfinitenion, subInfinitenion } from "./infinitenion"
 import { Integer, NonNegativeInteger } from "./integer";
 import { makeRational, Rational } from "./rational";
 
@@ -92,4 +92,16 @@ test("test imaginary number", () => {
     const e15 = nthImaginary(15 as NonNegativeInteger);
     // ノルム則の敗れ
     expect(mulInfinitenion(addInfinitenion(e3, e10), subInfinitenion(e6, e15))).toBe(0);
+});
+
+test("infinitenion to string", () => {
+    expect(infinitenionToString(0)).toBe("0");
+    expect(infinitenionToString(1.5)).toBe("1.5");
+    expect(infinitenionToString(makeRational(2 as Integer, 3 as Integer) as Rational)).toBe("2 3 /");
+    expect(infinitenionToString(nthImaginary(1 as NonNegativeInteger))).toBe("1 i");
+    expect(infinitenionToString(nthImaginary(2 as NonNegativeInteger))).toBe("2 i");
+    expect(infinitenionToString(nthImaginary(3 as NonNegativeInteger))).toBe("3 i");
+    expect(infinitenionToString(nthImaginary(10 as NonNegativeInteger))).toBe("10 i");
+    expect(infinitenionToString(addInfinitenion(1, nthImaginary(10 as NonNegativeInteger)))).toBe("1 10 i +");
+    expect(infinitenionToString(addInfinitenion(1, mulInfinitenion(makeRational(1 as Integer, 2 as Integer) as Rational, nthImaginary(10 as NonNegativeInteger))))).toBe("1 1 2 / 10 i * +");
 });

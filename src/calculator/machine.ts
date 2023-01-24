@@ -1,4 +1,4 @@
-import { addInfinitenion, divInfinitenion, Infinitenion, mulInfinitenion, nthImaginary, powInfinitenion, subInfinitenion } from "../infinitenion/infinitenion";
+import { addInfinitenion, divInfinitenion, Infinitenion, infinitenionToString, mulInfinitenion, nthImaginary, powInfinitenion, subInfinitenion } from "../infinitenion/infinitenion";
 import { isInteger, isNonNegativeInteger } from "../infinitenion/integer";
 import { tokensParser } from "./parser";
 
@@ -116,7 +116,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
                             console.warn("stack underflow!\n");
                             return saved;
                         }
-                        console.log(n);
+                        console.log(infinitenionToString(n));
                         break;
                     }
                 }
@@ -126,3 +126,6 @@ export const evaluate = (line: string, stack: Stack): Stack => {
     return stack;
 }
 
+export const stackToString = (stack: Stack): string => {
+    return "[" + stack.map(infinitenionToString).join(",") + "]";
+}

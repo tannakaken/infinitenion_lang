@@ -1,5 +1,5 @@
 import { Integer } from "./integer";
-import { addRational,invRational,makeRational, mulRational, negateRational, Rational } from "./rational";
+import { addRational,invRational,makeRational, mulRational, negateRational, Rational, rationalToString } from "./rational";
 
 test("make rational number", () => {
     const r0 = makeRational(1 as Integer, 0 as Integer);
@@ -115,4 +115,8 @@ test("negate rational", () => {
     const r3 = negateRational(r2);
     expect((r3 as Rational).numerator).toBe(2);
     expect((r3 as Rational).denominator).toBe(3);
-})
+});
+
+test("rational to string", () => {
+    expect(rationalToString(makeRational(2 as Integer, 3 as Integer) as Rational)).toBe("2 3 /");
+});

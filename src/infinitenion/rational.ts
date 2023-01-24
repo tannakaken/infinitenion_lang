@@ -165,3 +165,5 @@ export const negateRational = (a: Rational): Base => {
 export const isRational = (x: Infinitenion): x is Rational => {
     return typeof x === "object" && "numerator" in x && "denominator" in x;
 }
+
+export const rationalToString = (a : Rational): string => `${a.numerator} ${a.denominator} /`;

@@ -1,5 +1,5 @@
 import * as readline from "readline";
-import { evaluate, makeStack } from "./src/calculator/machine";
+import { evaluate, makeStack, stackToString } from "./src/calculator/machine";
 
 const repl = () => {
     let stack = makeStack();
@@ -10,7 +10,7 @@ const repl = () => {
     });
     r.on("line", (line) => {
         stack = evaluate(line, stack);
-        console.log(stack);
+        console.log(stackToString(stack));
         r.prompt();
     });
     r.prompt();
