@@ -1,54 +1,57 @@
-import { Rational } from "./rational";
-import { addBase, Base, isZeroBase, mulBase, negateBase } from "./base";
-import { number } from "yargs";
+import { isRational, Rational } from "./rational";
+import { addBase, Base, inverseBase, mulBase, negateBase } from "./base";
+import { Integer, NonNegativeInteger } from "./integer";
 
 /**
  * ケーリーディクソン構成された超複素数
  */
-export type CayleyDickson<B extends Base> = {
-    real: Infinitenion<B>;
-    image: Infinitenion<B>;
+export type CayleyDickson = {
+    real: Infinitenion;
+    image: Infinitenion;
     height: number;
 };
 
-export type Infinitenion<B extends Base> = CayleyDickson<B> | B;
+/**
+ * Infinitenionは基底体に含まれる数かケーリーディクソン構成された超複素数
+ */
+export type Infinitenion = CayleyDickson | Base;
 
-export const isZero = <B extends Base>(a: Infinitenion<B>) => {
-    if (heightCayleyDickson(a) === 0) {
-        return isZeroBase(a as B);
-    }
-    return false;
-}
-
-export const realCayleyDickson = <B extends Base>(a: Infinitenion<B>): Infinitenion<B> => {
-    return heightCayleyDickson(a) === 0 ? (a as B) : (a as CayleyDickson<B>).real;
-}
-export const imageCayleyDickson = <B extends Base>(a: Infinitenion<B>, zero: B): Infinitenion<B> => {
-    return heightCayleyDickson(a) === 0 ? zero : (a as CayleyDickson<B>).image;
-}
-
-export const heightCayleyDickson = <B extends Base>(a: Infinitenion<B>): number => {
+/**
+ * {@link Infinitenion}の高さ
+ */
+export const heightInfinitenion = (a: Infinitenion): number => {
     if (typeof a === "number") {
         return 0;
     }
-    const a2 = a as Rational | CayleyDickson<B>;
-    if ('numerator' in a2) {
+    if (isRational(a)) {
         return 0;
     }
-    return a2.height;
+    return a.height;
 }
 
-export const makeInfinitenion = <B extends Base>(real: Infinitenion<B>, image: Infinitenion<B>): Infinitenion<B> => {
-    const realHeight = heightCayleyDickson(real);
-    const imageHeight = heightCayleyDickson(image);
-    const height = Math.max(realHeight, imageHeight) + 1;
-    return {
-        real,
-        image,
-        height
-    };
+/**
+ * 基底体の値かどうかを判定する{@link Base}の型ガード
+ */
+export const isBase  = (x : Infinitenion): x is Base => {
+    return heightInfinitenion(x) === 0;
 }
 
+/**
+ * {@link Infinitenion}の実部
+ */
+export const realOfInfinitenion = (a: Infinitenion): Infinitenion => {
+    return isBase(a) ? a : a.real;
+}
+/**
+ * {@link Infinitenion}の虚部
+ */
+export const imageOfInfinitenion = (a: Infinitenion): Infinitenion => {
+    return isBase(a) ? 0 : a.image;
+}
+
+/**
+ * nに含まれる最大の2の冪乗と、その冪
+ */
 const calcGreatestPowerOfTwo = (n: number, current = 1, height = 1): [number, number] => {
     const next = current * 2;
     if (next > n) {
@@ -57,101 +60,186 @@ const calcGreatestPowerOfTwo = (n: number, current = 1, height = 1): [number, nu
     return calcGreatestPowerOfTwo(n, next, height + 1);
 }
 
-export const nthImaginary = <B extends Base>(nth: number, zero: B, one: B): Infinitenion<B> => {
+/**
+ * nth番目の虚数単位
+ */
+export const nthImaginary = (nth: NonNegativeInteger): Infinitenion => {
     if (nth === 0) {
-        return one;
+        return 1;
     }
     const [greatestPowerOfTwo, height] = calcGreatestPowerOfTwo(nth);
     return {
-        real: zero,
-        image: nthImaginary(nth - greatestPowerOfTwo, zero, one),
+        real: 0,
+        image: nthImaginary(nth - greatestPowerOfTwo as NonNegativeInteger),
         height,
     }
 }
 
-export const addCayleyDickson = <B extends Base>(a: Infinitenion<B>, b: Infinitenion<B>): Infinitenion<B> => {
-    const heightA = heightCayleyDickson(a);
-    const heightB = heightCayleyDickson(b);
+/**
+ * {@link Infinitenion}の足し算
+ */
+export const addInfinitenion = (a: Infinitenion, b: Infinitenion): Infinitenion => {
+    const heightA = heightInfinitenion(a);
+    const heightB = heightInfinitenion(b);
     if (heightA === 0 && heightB === 0) {
-        const a2 = a as B;
-        const b2 = b as B;
-        return addBase(a2, b2);
+        return addBase(a as Base, b as Base);
     }
     if (heightA === heightB) {
-        const a2 = a as CayleyDickson<B>;
-        const b2 = b as CayleyDickson<B>;
-        return simplifyCayleyDickson({real: addCayleyDickson(a2.real, b2.real), image: addCayleyDickson(a2.image, b2.image), height: heightA});
+        const a2 = a as CayleyDickson;
+        const b2 = b as CayleyDickson;
+        return simplifyCayleyDickson({real: addInfinitenion(a2.real, b2.real), image: addInfinitenion(a2.image, b2.image), height: heightA});
     }
     if (heightA > heightB) {
-        const a2 = a as CayleyDickson<B>;
-        return simplifyCayleyDickson({real: addCayleyDickson(a2.real, b), image: a2.image, height: heightA});
+        const a2 = a as CayleyDickson;
+        return simplifyCayleyDickson({real: addInfinitenion(a2.real, b), image: a2.image, height: heightA});
     }
-    const b2 = b as CayleyDickson<B>;
-    return simplifyCayleyDickson({real: addCayleyDickson(a, b2.real), image: b2.image, height: heightB});
-}
-
-export const subCayleyDickson = <B extends Base>(a: Infinitenion<B>, b: Infinitenion<B>): Infinitenion<B> => {
-    return addCayleyDickson(a, negateCayleyDickson(b));
-}
-
-
-export const negateCayleyDickson = <B extends Base>(a: Infinitenion<B>): Infinitenion<B> => {
-    if (heightCayleyDickson(a) === 0) {
-        return negateBase(a as B);
-    }
-    const a2 = a as CayleyDickson<B>;
-    return {real: negateCayleyDickson(a2.real), image: negateCayleyDickson(a2.image), height: a2.height};
-}
-
-
-export const conjugateCayleyDickson = <B extends Base>(a: Infinitenion<B>): Infinitenion<B> => {
-    if (heightCayleyDickson(a) === 0) {
-        return a;
-    }
-    const a2 = a as CayleyDickson<B>;
-    return {real: conjugateCayleyDickson(a2.real), image: negateCayleyDickson(a2.image), height: a2.height};
+    const b2 = b as CayleyDickson;
+    return simplifyCayleyDickson({real: addInfinitenion(a, b2.real), image: b2.image, height: heightB});
 }
 
 /**
+ * {@link Infinitenion}の引き算
+ */
+export const subInfinitenion = (a: Infinitenion, b: Infinitenion): Infinitenion => {
+    return addInfinitenion(a, negInfinitenion(b));
+}
+
+/**
+ * {@link Infinitenion}の和の逆元
+ */
+export const negInfinitenion = (a: Infinitenion): Infinitenion => {
+    if (isBase(a)) {
+        return negateBase(a);
+    }
+    return {real: negInfinitenion(a.real), image: negInfinitenion(a.image), height: a.height};
+}
+
+/**
+ * {@link}の共役
+ */
+export const conjInfinitenion = (a: Infinitenion): Infinitenion => {
+    if (isBase(a)) {
+        return a;
+    }
+    return {real: conjInfinitenion(a.real), image: negInfinitenion(a.image), height: a.height};
+}
+
+/**
+ * {@link}の掛け算
+ * 
  * https://ja.wikipedia.org/wiki/%E3%82%B1%E3%83%BC%E3%83%AA%E3%83%BC%EF%BC%9D%E3%83%87%E3%82%A3%E3%82%AF%E3%82%BD%E3%83%B3%E3%81%AE%E6%A7%8B%E6%88%90%E6%B3%95
  * を参考にした。
  */
-export const mulCayleyDickson = <B extends Base>(a: Infinitenion<B>, b: Infinitenion<B>): Infinitenion<B> => {
-    const heightA = heightCayleyDickson(a);
-    const heightB = heightCayleyDickson(b);
+export const mulInfinitenion = (a: Infinitenion, b: Infinitenion): Infinitenion => {
+    const heightA = heightInfinitenion(a);
+    const heightB = heightInfinitenion(b);
     if (heightA === 0 && heightB === 0) {
-        return mulBase(a as B, b as B);
+        return mulBase(a as Base, b as Base);
     }
     if (heightA === heightB) {
         // https://ja.wikipedia.org/wiki/%E3%82%B1%E3%83%BC%E3%83%AA%E3%83%BC%EF%BC%9D%E3%83%87%E3%82%A3%E3%82%AF%E3%82%BD%E3%83%B3%E3%81%AE%E6%A7%8B%E6%88%90%E6%B3%95
         // に従った
-        const a2 = a as CayleyDickson<B>;
-        const b2 = b as CayleyDickson<B>;
-        const c = mulCayleyDickson(a2.real, b2.real);
-        const d = mulCayleyDickson(conjugateCayleyDickson(b2.image), a2.image);
-        const e = mulCayleyDickson(b2.image, a2.real);
-        const f = mulCayleyDickson(a2.image, conjugateCayleyDickson(b2.real));
-        return simplifyCayleyDickson({real: subCayleyDickson(c,d), image: addCayleyDickson(e, f), height: heightA});
+        const a2 = a as CayleyDickson;
+        const b2 = b as CayleyDickson;
+        const c = mulInfinitenion(a2.real, b2.real);
+        const d = mulInfinitenion(conjInfinitenion(b2.image), a2.image);
+        const e = mulInfinitenion(b2.image, a2.real);
+        const f = mulInfinitenion(a2.image, conjInfinitenion(b2.real));
+        return simplifyCayleyDickson({real: subInfinitenion(c,d), image: addInfinitenion(e, f), height: heightA});
     }
     if (heightA > heightB) {
         // https://ja.wikipedia.org/wiki/%E3%82%B1%E3%83%BC%E3%83%AA%E3%83%BC%EF%BC%9D%E3%83%87%E3%82%A3%E3%82%AF%E3%82%BD%E3%83%B3%E3%81%AE%E6%A7%8B%E6%88%90%E6%B3%95
         // における共役作用素に注意順序に注意
-        const a2 = a as CayleyDickson<B>;
-        return simplifyCayleyDickson({real: mulCayleyDickson(a2.real, b), image: mulCayleyDickson(a2.image, conjugateCayleyDickson(b)), height: heightA});
+        const a2 = a as CayleyDickson;
+        return simplifyCayleyDickson({real: mulInfinitenion(a2.real, b), image: mulInfinitenion(a2.image, conjInfinitenion(b)), height: heightA});
     }
-    const b2 = b as CayleyDickson<B>;
+    const b2 = b as CayleyDickson;
     // https://ja.wikipedia.org/wiki/%E3%82%B1%E3%83%BC%E3%83%AA%E3%83%BC%EF%BC%9D%E3%83%87%E3%82%A3%E3%82%AF%E3%82%BD%E3%83%B3%E3%81%AE%E6%A7%8B%E6%88%90%E6%B3%95
     // の掛け算の順序に注意
-    return simplifyCayleyDickson({real: mulCayleyDickson(a, b2.real), image: mulCayleyDickson(b2.image, a), height: heightB});
+    return simplifyCayleyDickson({real: mulInfinitenion(a, b2.real), image: mulInfinitenion(b2.image, a), height: heightB});
 }
 
-const simplifyCayleyDickson = <B extends Base>(a: Infinitenion<B>): Infinitenion<B> => {
-    if (heightCayleyDickson(a) === 0) {
-        return a;
+/**
+ * {@link Infinitenion}のノルムの２条
+ */
+export const squareNormInfinitenion = (a: Infinitenion): Base => {
+    if (isBase(a)) {
+        return mulBase(a, a);
     }
-    const a2 = a as CayleyDickson<B>;
-    if (isZero(a2.image)) {
-        return a2.real;
+    return addBase(squareNormInfinitenion(a.real), squareNormInfinitenion(a.image));
+}
+
+/**
+ * {@link Infinitenion}の積の逆元
+ * 
+ * ただし、{@link Infinitenion}の積は結合則を満たさないので、群の議論は使えず、
+ * 高さが4以上では零因子も存在しているので、通常の群の逆元とはかなり性質が異なる。
+ */
+export const invInfinitenion = (a: Infinitenion): Infinitenion | null => {
+    if (isBase(a)) {
+        return inverseBase(a);
     }
-    return a2;
+    const squareNorm = squareNormInfinitenion(a);
+    const inverseSquareNorm = inverseBase(squareNorm) as Rational; // squareNormは0にならない。
+    return mulInfinitenion(inverseSquareNorm, conjInfinitenion(a));
+}
+
+/**
+ * {@link Infinitenion}の割り算
+ * 
+ * 0で割り算をしたときはnull
+ * 
+ * ただし{@link Infinitenion}では、
+ * 高さが4以上で零因子が存在しているので、通常の割り算とはかなり性質が異なる。
+ */
+export const divInfinitenion = (a: Infinitenion, b: Infinitenion): Infinitenion | null => {
+    const inverseB = invInfinitenion(b);
+    if (inverseB === null) {
+        return null;
+    }
+    return mulInfinitenion(a, inverseB);
+}
+
+/**
+ * {@link Infinitenion}の冪乗
+ * 
+ * 冪指数が整数の時のみ定義される。
+ * 
+ * 底が0で冪指数が負のときはnull
+ */
+export const powInfinitenion = (base: Infinitenion, pow: Integer): Infinitenion | null => {
+    if (base === 0 && pow > 0) {
+        return 0;
+    }
+    if (pow === 0) {
+        return 1;
+    }
+    const newBase = pow > 0 ? base : invInfinitenion(base);
+    if (newBase === null) {
+        return null;
+    }
+    const positiveExp = Math.abs(pow) as NonNegativeInteger;
+    return powInfinitenionAux(newBase, positiveExp, 1);
+}
+
+/**
+ * 冪乗を求める補助関数
+ */
+const powInfinitenionAux = (base: Infinitenion, exp: NonNegativeInteger, acc: Infinitenion): Infinitenion => {
+    if (exp === 0) {
+        return acc;
+    }
+    const newExp = exp >> 1 as NonNegativeInteger;
+    const newAcc = exp % 2 === 0 ? acc : mulInfinitenion(base, acc);
+    return powInfinitenionAux(mulInfinitenion(base, base), newExp, newAcc)
+}
+
+/**
+ * ケーリーディクソン構成の無駄な枝を刈る
+ */
+const simplifyCayleyDickson = (a: CayleyDickson): Infinitenion => {
+    if (a.image === 0) {
+        return a.real;
+    }
+    return a;
 }

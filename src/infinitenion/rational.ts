@@ -1,7 +1,10 @@
+import { Base } from "./base";
+import { Infinitenion } from "./infinitenion";
 import { gcd, Integer } from "./integer";
 
 /**
- * 分数の約分に使うためのgcd
+ * 分数の約分に使うための符号を調節した共通因数
+ * 
  * @param numerator
  * @param denominator 
  * @returns xとyの最小公約数。ただし、約分の際分母をいつも正にするため、
@@ -35,28 +38,44 @@ const toPositiveZeroIfZero = (integer: Integer): Integer => {
     return integer;
 }
 
+/**
+ * 基底体としての有理数
+ * 
+ * 整数同士の計算はできるだけ有理数として計算する。
+ */
 export type Rational = {
     numerator: Integer,
     denominator: Integer,
 };
 
-const reduceRational = (a: Rational): Rational => {
-    const g = reducer(a.numerator, a.denominator);
-    if (g === 1) {
+/**
+ * 可能な限り約分する。
+ * 
+ * 整数になる場合は整数にする。
+ */
+const reduceRational = (a: Rational): Base => {
+    if (a.denominator === 1) {
+        return a.numerator;
+    }
+    const r = reducer(a.numerator, a.denominator);
+    if (r === 1) {
         return a;
     }
-    const numerator = a.numerator / g;
-    
+    const newNumerator = a.numerator / r as Integer;
+    const newDenominator = a.denominator / r as Integer;
+    if (newDenominator === 1) {
+        return toPositiveZeroIfZero(newNumerator); // -0避け
+    }
     return {
-        numerator: toPositiveZeroIfZero(a.numerator / g as Integer), // -0避け
-        denominator: a.denominator / g as Integer,
+        numerator: toPositiveZeroIfZero(newNumerator), // -0避け
+        denominator: newDenominator,
     }
 }
 
 /**
  * 有理数を作る関数。分母が0の時はnullを返す。
  */
-export const makeRational = (numerator: Integer, denominator: Integer): Rational | null => {
+export const makeRational = (numerator: Integer, denominator: Integer): Base | null => {
     if (denominator === 0) {
         return null;
     } 
@@ -67,9 +86,9 @@ export const makeRational = (numerator: Integer, denominator: Integer): Rational
 };
 
 /**
- * 有理数を足し算する関数。
+ * 有理数の足し算
  */
-export const addRational = (a: Rational, b: Rational): Rational => {
+export const addRational = (a: Rational, b: Rational): Base => {
     const g = gcd(a.denominator, b.denominator);
     return reduceRational({
         numerator: a.numerator * b.denominator / g + b.numerator * a.denominator / g as Integer,
@@ -78,9 +97,20 @@ export const addRational = (a: Rational, b: Rational): Rational => {
 }
 
 /**
- * 有理数を掛け算する関数。
+ * 有理数と整数との足し算
  */
-export const mulRational = (a: Rational, b: Rational): Rational => {
+export const addRationalInteger = (a: Rational, b: Integer): Base => {
+    return reduceRational({
+        numerator: a.numerator + (b * a.denominator) as Integer,
+        denominator: a.denominator
+    });
+}
+
+
+/**
+ * 有理数の掛け算
+ */
+export const mulRational = (a: Rational, b: Rational): Base => {
     return reduceRational({
         numerator: a.numerator * b.numerator as Integer,
         denominator: a.denominator * b.denominator as Integer,
@@ -88,17 +118,30 @@ export const mulRational = (a: Rational, b: Rational): Rational => {
 }
 
 /**
- * 有理数を逆数にする関数。
+ * 有理数と整数の足し算
  */
-export const inverseRational = (a: Rational): Rational | null => {
-    if (a.numerator === 0) {
-        return null;
-    }
+export const mulRationalInteger = (a: Rational, b: Integer): Base => {
+    return reduceRational({
+        numerator: a.numerator * b as Integer,
+        denominator: a.denominator
+    });
+}
+
+/**
+ * 有理数の逆数
+ */
+export const invRational = (a: Rational): Base | null => {
     if (a.numerator > 0) {
+        if (a.numerator === 1) {
+            return a.denominator;
+        }
         return {
             numerator: a.denominator,
             denominator: a.numerator,
         };
+    }
+    if (-a.numerator === 1) {
+        return -a.denominator;
     }
     return {
         numerator: -a.denominator as Integer,
@@ -107,9 +150,9 @@ export const inverseRational = (a: Rational): Rational | null => {
 }
 
 /**
- * 有理数の富豪を反転する関数。
+ * 有理数の符号反転
  */
-export const negateRational = (a: Rational): Rational => {
+export const negateRational = (a: Rational): Base => {
     return {
         numerator: toPositiveZeroIfZero(-a.numerator as Integer),
         denominator: a.denominator
@@ -117,17 +160,8 @@ export const negateRational = (a: Rational): Rational => {
 }
 
 /**
- * 有理数の0
+ * {@link Rational}の型ガード
  */
-export const zeroRational: Rational = {
-    numerator: 0 as Integer,
-    denominator: 1 as Integer,
-} as const;
-
-/**
- * 有理数の1
- */
-export const oneRational: Rational = {
-    numerator: 1 as Integer,
-    denominator: 1 as Integer,
-} as const;
+export const isRational = (x: Infinitenion): x is Rational => {
+    return typeof x === "object" && "numerator" in x && "denominator" in x;
+}
