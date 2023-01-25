@@ -38,16 +38,16 @@ import {
   instructionsParser,
 } from "./parser";
 
-type Stack = Infinitenion[];
+type Stack = (Infinitenion | string)[];
 
 export const makeStack = (): Stack => [];
 
-export const pushStack = (x: Infinitenion, stack: Stack): Stack => {
+export const pushStack = (x: Infinitenion | string, stack: Stack): Stack => {
   stack.push(x);
   return stack;
 };
 
-export const popStack = (stack: Stack): [Infinitenion | undefined, Stack] => {
+export const popStack = (stack: Stack): [Infinitenion | string | undefined, Stack] => {
   const x = stack.pop();
   return [x, stack];
 };
@@ -76,14 +76,26 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_IF: {
         const condition = stack.pop();
         if (condition === 0) {
-          programCounter = instructions[programCounter + 1];
+          const jump = instructions[programCounter + 1];
+          if (typeof jump === "number") {
+            programCounter = jump;
+          } else {
+            console.warn("invalid jump:" + jump);
+            return saved;
+          }
         } else {
           programCounter += 2;
         }
         break;
       }
       case CODE_ELSE: {
-        programCounter = instructions[programCounter + 1];
+        const jump = instructions[programCounter + 1];
+        if (typeof jump == "number") {
+            programCounter = jump;
+        } else {
+            console.warn("invalid jump:" + jump);
+            return saved;
+        }
         break;
       }
       case CODE_THEN: {
@@ -98,11 +110,11 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 !== "number") {
-          console.warn("not integer loop start\n");
+          console.warn("not integer loop start");
           return saved;
         }
         if (typeof i2 !== "number") {
-          console.warn("not integer loop start\n");
+          console.warn("not integer loop start");
           return saved;
         }
         loopCountStack.push(i1);
@@ -120,7 +132,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           loopEndStack.pop();
           programCounter += 2;
         } else {
-          programCounter = instructions[programCounter + 1];
+            const jump = instructions[programCounter + 1];
+            if (typeof jump === "number") {
+                programCounter = jump;
+            } else {
+                console.warn("invalid jump:" + jump);
+                return saved;
+            }
         }
         break;
       }
@@ -147,7 +165,14 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           console.warn("stack underflow!\n");
           return saved;
         }
-        stack.push(addInfinitenion(i2, i1));
+        if (typeof i1 === "string" && typeof i2 === "string") {
+            stack.push(i1 + i2);
+        } else if (typeof i1 === "string" || typeof i2 === "string") {
+            console.warn("can not add string and infinitenion");
+            return saved;
+        } else {
+            stack.push(addInfinitenion(i2, i1));
+        }
         programCounter++;
         break;
       }
@@ -157,6 +182,10 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         if (i1 === undefined || i2 === undefined) {
           console.warn("stack underflow!\n");
           return saved;
+        }
+        if (typeof i1 === "string" || typeof i2 === "string") {
+            console.warn("only infinitenion can substract");
+            return saved;
         }
         stack.push(subInfinitenion(i2, i1));
         programCounter++;
@@ -169,6 +198,10 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           console.warn("stack underflow!\n");
           return saved;
         }
+        if (typeof i1 === "string" || typeof i2 === "string") {
+            console.warn("only infinitenion can multiply");
+            return saved;
+        }
         stack.push(mulInfinitenion(i2, i1));
         programCounter++;
         break;
@@ -179,6 +212,10 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         if (i1 === undefined || i2 === undefined) {
           console.warn("stack underflow!\n");
           return saved;
+        }
+        if (typeof i1 === "string" || typeof i2 === "string") {
+            console.warn("only infinitenion can divide");
+            return saved;
         }
         const result = divInfinitenion(i2, i1);
         if (result === null) {
@@ -211,6 +248,9 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         if (i1 === undefined || i2 === undefined) {
           console.warn("stack underflow!\n");
           return saved;
+        }if (typeof i2 === "string") {
+            console.warn("only infinitenion can exponent");
+            return saved;
         }
         if (typeof i1 === "number" && isInteger(i1)) {
           const result = powInfinitenion(i2, i1);
@@ -233,7 +273,14 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           console.warn("stack underflow!\n");
           return saved;
         }
-        stack.push(equalInfinitenion(i1, i2));
+        if (typeof i1 === "string" && typeof i2 === "string") {
+            stack.push(i1 === i2 ? 1 : 0);
+        } else if (typeof i1 === "string" || typeof i2 === "string") {
+            console.warn("can not compare infinitenion and string");
+            return saved;
+        } else {
+            stack.push(equalInfinitenion(i1, i2));
+        }
         programCounter++;
         break;
       }
@@ -338,7 +385,11 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           console.warn("stack underflow!\n");
           return saved;
         }
-        process.stdin.write(infinitenionToString(n));
+        if (typeof n === "string") {
+            process.stdin.write(n);
+        } else {
+            process.stdin.write(infinitenionToString(n));
+        }
         programCounter++;
         break;
       }
@@ -353,5 +404,5 @@ export const evaluate = (line: string, stack: Stack): Stack => {
 };
 
 export const stackToString = (stack: Stack): string => {
-  return "[" + stack.map((val) => infinitenionToString(val)).join(",") + "]";
+  return "[" + stack.map((val) => typeof val == "string" ? JSON.stringify(val) : infinitenionToString(val)).join(",") + "]";
 };

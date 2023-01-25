@@ -30,6 +30,13 @@ type FloatResult = {
   type: "Float";
   value: number;
 };
+/**
+ * 文字列取得の成功
+ */
+type StringResult = {
+    type: "String",
+    value: string;
+}
 
 const OPERATORS = [
   "if",
@@ -53,6 +60,8 @@ const OPERATORS = [
   "e",
   "i",
   ".",
+  ":",
+  ";"
 ] as const;
 type Operator = (typeof OPERATORS)[number];
 /**
@@ -70,7 +79,7 @@ const OPERATOR_RESULTS = OPERATORS.reduce((acc, value) => {
 /**
  * 成功
  */
-export type SuccessResult = IntegerResult | FloatResult | OperatorResult;
+export type SuccessResult = IntegerResult | FloatResult | StringResult | OperatorResult;
 export type Result = NullResult | SuccessResult;
 /**
  * 文字列をパースして結果と残りの文字列を返す関数
@@ -112,6 +121,19 @@ export const floatParser: Parser = (line) => {
   return [result, rest];
 };
 
+export const stringParser: Parser = (line) => {
+    if (!line.startsWith("\"")) {
+        return [NULL_RESULT, line];
+    }
+    const matchResult = line.substring(1).match(/[^\\]"/);
+    if (matchResult === null || matchResult.index === undefined) {
+        return [NULL_RESULT, line];
+    }
+    const result = JSON.parse(line.substring(0, matchResult.index + 3)) as string;
+    const rest = line.substring(matchResult.index + 3);
+    return [{type: "String", value: result}, rest];
+}
+
 /**
  * 与えられた{@link Parser}を一つずつ試していき、うまくいったものがあればその結果を返し、
  * 全てうまくいかなかったら失敗にする{@link Parser}を作る。
@@ -129,9 +151,9 @@ export const makeOrParser = (parsers: Parser[]): Parser => {
 };
 
 /**
- * まず浮動小数点数を取得しようとし、それが失敗したら整数を取得しようとする{@link Parser}
+ * 浮動小数点数、整数、文字列の順に取得しようとする{@link Parser}
  */
-export const numberParser = makeOrParser([floatParser, integerParser]);
+export const valueParser = makeOrParser([floatParser, integerParser, stringParser]);
 
 const makeOperatorParser = (operator: Operator): Parser => {
   return (line) => {
@@ -152,7 +174,7 @@ export const operatorsParser = makeOrParser(OPERATOR_PARSERS);
 /**
  * まず数を取得しようとし、その後演算子を取得しようとするパーサー
  */
-export const tokenParser = makeOrParser([numberParser, operatorsParser]);
+export const tokenParser = makeOrParser([valueParser, operatorsParser]);
 
 type ArrayResylt = SuccessResult[] | null;
 
@@ -220,8 +242,8 @@ export const inBranch = () => {
 
 export const instructionsParser = (
   line: string,
-  instructions: number[]
-): number[] | null => {
+  instructions: (number | string)[]
+): (number | string)[] | null => {
   const tokens = tokenizer(line);
   if (tokens === null) {
     return null;
@@ -231,6 +253,7 @@ export const instructionsParser = (
     switch (token.type) {
       case "Integer":
       case "Float":
+      case "String":
         instructions.push(CODE_PUSH, token.value);
         programCounter += 2;
         break;
