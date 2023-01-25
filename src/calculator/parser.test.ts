@@ -1,9 +1,4 @@
-import {
-  floatParser,
-  integerParser,
-  numberParser,
-  tokensParser,
-} from "./parser";
+import { floatParser, integerParser, numberParser, tokenizer } from "./parser";
 
 test("parse int", () => {
   const [result, rest] = integerParser("123abc");
@@ -72,7 +67,7 @@ test("parse number", () => {
 });
 
 test("tokens parser", () => {
-  const result = tokensParser("+123.456 12+ 123-");
+  const result = tokenizer("+123.456 12+ 123-");
   if (result === null) {
     fail();
   } else {
@@ -83,6 +78,6 @@ test("tokens parser", () => {
     expect(result[3].value).toBe(123);
     expect(result[4].value).toBe("-");
   }
-  const result2 = tokensParser("123.456_789");
+  const result2 = tokenizer("123.456_789");
   expect(result2).toBeNull();
 });

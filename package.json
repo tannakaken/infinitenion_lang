@@ -2,7 +2,7 @@
   "name": "infinitenion_lang",
   "version": "0.1.0",
   "description": "forth-like programming language for hyper-complex number",
-  "main": "index.ts",
+  "main": "src/index.ts",
   "repository": "https://github.com/tannakaken/infinitenion_lang.git",
   "author": "tannakaken <tannakaken@gmail.com>",
   "license": "MIT",

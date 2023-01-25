@@ -31,7 +31,29 @@ type FloatResult = {
   value: number;
 };
 
-const OPERATORS = ["+", "-", "*", "/", "^", "i", "."] as const;
+const OPERATORS = [
+  "if",
+  "else",
+  "then",
+  "do",
+  "loop",
+  "dup",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "^",
+  "=",
+  "<=",
+  "<",
+  ">=",
+  ">",
+  "cr",
+  "e",
+  "i",
+  ".",
+] as const;
 type Operator = (typeof OPERATORS)[number];
 /**
  * オペレーター取得の成功
@@ -163,4 +185,183 @@ export const makeArrayParser = (
 /**
  * 文字列をトークンに分解し切る関数。
  */
-export const tokensParser = makeArrayParser(tokenParser);
+export const tokenizer = makeArrayParser(tokenParser);
+
+export const CODE_END = 0;
+export const CODE_PUSH = -1;
+export const CODE_PLUS = -2;
+export const CODE_MINUS = -3;
+export const CODE_MULT = -4;
+export const CODE_DIV = -5;
+export const CODE_MOD = -6;
+export const CODE_POW = -7;
+export const CODE_EQUAL = -8;
+export const CODE_LESS = -9;
+export const CODE_LEQ = -10;
+export const CODE_GREAT = -11;
+export const CODE_GEQ = -12;
+export const CODE_IMAGINARY = -13;
+export const CODE_IF = -14;
+export const CODE_ELSE = -15;
+export const CODE_THEN = -16;
+export const CODE_DO = -17;
+export const CODE_LOOP = -18;
+export const CODE_PRINT = -19;
+export const CODE_INDEX = -20;
+export const CODE_DUP = -21;
+export const CODE_CR = -22;
+export const CODE_PLACEFOLDER = -23;
+
+const branchStack: number[] = [];
+
+export const inBranch = () => {
+  return branchStack.length > 0;
+};
+
+export const instructionsParser = (
+  line: string,
+  instructions: number[]
+): number[] | null => {
+  const tokens = tokenizer(line);
+  if (tokens === null) {
+    return null;
+  }
+  let programCounter = instructions.length;
+  for (const token of tokens) {
+    switch (token.type) {
+      case "Integer":
+      case "Float":
+        instructions.push(CODE_PUSH, token.value);
+        programCounter += 2;
+        break;
+      case "Operator":
+        switch (token.value) {
+          case "if":
+            instructions.push(CODE_IF);
+            instructions.push(CODE_PLACEFOLDER);
+            branchStack.push(programCounter + 1);
+            programCounter += 2;
+            break;
+          case "else": {
+            instructions.push(CODE_ELSE);
+            const idx = branchStack.pop();
+            if (idx === undefined) {
+              return null;
+            }
+            instructions[idx] = programCounter + 2;
+            instructions.push(CODE_PLACEFOLDER);
+            branchStack.push(programCounter + 1);
+            programCounter += 2;
+            break;
+          }
+          case "then": {
+            instructions.push(CODE_THEN);
+            const idx = branchStack.pop();
+            if (idx === undefined) {
+              return null;
+            }
+            instructions[idx] = programCounter + 1;
+            programCounter++;
+            break;
+          }
+          case "do": {
+            instructions.push(CODE_DO);
+            branchStack.push(programCounter + 1);
+            programCounter++;
+            break;
+          }
+          case "loop": {
+            instructions.push(CODE_LOOP);
+            const idx = branchStack.pop();
+            if (idx === undefined) {
+              return null;
+            }
+            instructions.push(idx);
+            programCounter += 2;
+            break;
+          }
+          case "+": {
+            instructions.push(CODE_PLUS);
+            programCounter++;
+            break;
+          }
+          case "-": {
+            instructions.push(CODE_MINUS);
+            programCounter++;
+            break;
+          }
+          case "*": {
+            instructions.push(CODE_MULT);
+            programCounter++;
+            break;
+          }
+          case "/": {
+            instructions.push(CODE_DIV);
+            programCounter++;
+            break;
+          }
+          case "%": {
+            instructions.push(CODE_MOD);
+            programCounter++;
+            break;
+          }
+          case "^": {
+            instructions.push(CODE_POW);
+            programCounter++;
+            break;
+          }
+          case "=": {
+            instructions.push(CODE_EQUAL);
+            programCounter++;
+            break;
+          }
+          case "<=": {
+            instructions.push(CODE_LEQ);
+            programCounter++;
+            break;
+          }
+          case "<": {
+            instructions.push(CODE_LESS);
+            programCounter++;
+            break;
+          }
+          case ">=": {
+            instructions.push(CODE_GEQ);
+            programCounter++;
+            break;
+          }
+          case ">": {
+            instructions.push(CODE_GREAT);
+            programCounter++;
+            break;
+          }
+          case ".": {
+            instructions.push(CODE_PRINT);
+            programCounter++;
+            break;
+          }
+          case "cr": {
+            instructions.push(CODE_CR);
+            programCounter++;
+            break;
+          }
+          case "i": {
+            instructions.push(CODE_INDEX);
+            programCounter++;
+            break;
+          }
+          case "dup": {
+            instructions.push(CODE_DUP);
+            programCounter++;
+            break;
+          }
+          case "e": {
+            instructions.push(CODE_IMAGINARY);
+            programCounter++;
+            break;
+          }
+        }
+    }
+  }
+  return instructions;
+};

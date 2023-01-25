@@ -3,6 +3,7 @@ import {
   addBase,
   Base,
   baseToString,
+  equalBase,
   inverseBase,
   mulBase,
   negateBase,
@@ -307,6 +308,28 @@ const simplifyCayleyDickson = (a: CayleyDickson): Infinitenion => {
     return a.real;
   }
   return a;
+};
+
+export const equalInfinitenion = (a: Infinitenion, b: Infinitenion): 0 | 1 => {
+  if (isBase(a)) {
+    if (isBase(b)) {
+      return equalBase(a, b);
+    }
+    return 0;
+  }
+  if (isBase(b)) {
+    return 0;
+  }
+  if (heightInfinitenion(a) !== heightInfinitenion(b)) {
+    return 0;
+  }
+  if (
+    equalInfinitenion(a.real, b.real) &&
+    equalInfinitenion(a.image, b.image)
+  ) {
+    return 1;
+  }
+  return 0;
 };
 
 export const infinitenionToString = (a: Infinitenion, nth = 0): string => {

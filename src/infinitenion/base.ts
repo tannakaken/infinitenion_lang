@@ -2,6 +2,8 @@ import { Integer, isInteger } from "./integer";
 import {
   addRational,
   addRationalInteger,
+  equalRational,
+  equalRationalNumber,
   invRational,
   isRational,
   mulRational,
@@ -100,6 +102,20 @@ export const inverseBase = (a: Base): Base | null => {
     return 1 / a;
   }
   return invRational(a);
+};
+
+export const equalBase = (a: Base, b: Base): 0 | 1 => {
+  if (typeof a === "number") {
+    if (typeof b === "number") {
+      return a === b ? 1 : 0;
+    }
+    return equalRationalNumber(b, a);
+  } else {
+    if (typeof b === "number") {
+      return equalRationalNumber(a, b);
+    }
+    return equalRational(a, b);
+  }
 };
 
 export const baseToString = (a: Base): string => {

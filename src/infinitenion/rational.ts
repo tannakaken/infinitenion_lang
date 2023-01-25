@@ -1,4 +1,4 @@
-import { Base } from "./base";
+import { Base, toNumber } from "./base";
 import { Infinitenion } from "./infinitenion";
 import { gcd, Integer } from "./integer";
 
@@ -160,6 +160,20 @@ export const negateRational = (a: Rational): Base => {
     numerator: toPositiveZeroIfZero(-a.numerator as Integer),
     denominator: a.denominator,
   };
+};
+
+export const equalRational = (a: Rational, b: Rational): 0 | 1 => {
+  if (a.numerator === b.numerator && a.denominator === b.denominator) {
+    return 1;
+  }
+  return 0;
+};
+
+export const equalRationalNumber = (a: Rational, b: number): 0 | 1 => {
+  if (toNumber(a) === b) {
+    return 1;
+  }
+  return 0;
 };
 
 /**
