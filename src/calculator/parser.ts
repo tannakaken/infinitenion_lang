@@ -34,9 +34,19 @@ type FloatResult = {
  * 文字列取得の成功
  */
 type StringResult = {
-    type: "String",
+    type: "String";
     value: string;
-}
+};
+
+type WordResult = {
+  type: "Word";
+  value: string;
+};
+
+type NewWordResult = {
+  type: "NewWord";
+  value: string;
+};
 
 const OPERATORS = [
   "if",
@@ -45,6 +55,11 @@ const OPERATORS = [
   "do",
   "loop",
   "dup",
+  "drop",
+  "swap",
+  "rot",
+  "-rot",
+  "over",
   "+",
   "-",
   "*",
@@ -60,8 +75,7 @@ const OPERATORS = [
   "e",
   "i",
   ".",
-  ":",
-  ";"
+  ";",
 ] as const;
 type Operator = (typeof OPERATORS)[number];
 /**
@@ -79,7 +93,7 @@ const OPERATOR_RESULTS = OPERATORS.reduce((acc, value) => {
 /**
  * 成功
  */
-export type SuccessResult = IntegerResult | FloatResult | StringResult | OperatorResult;
+export type SuccessResult = IntegerResult | FloatResult | StringResult | WordResult | NewWordResult | OperatorResult;
 export type Result = NullResult | SuccessResult;
 /**
  * 文字列をパースして結果と残りの文字列を返す関数
@@ -134,6 +148,37 @@ export const stringParser: Parser = (line) => {
     return [{type: "String", value: result}, rest];
 }
 
+export let words: {[key: string]: Instruction[]} = {};
+
+export const wordParser: Parser = (line) => {
+  const word = line.split(/\s+/, 1)[0];
+  if (word in words) {
+    return [{type: "Word", value: word}, line.substring(word.length)];
+  }
+  return [NULL_RESULT, line];
+}
+
+export const newWordParser: Parser = (line) => {
+  if (!line.startsWith(":")) {
+    return [NULL_RESULT, line];
+  }
+  const trimmed = line.substring(1).trim();
+  const word = trimmed.split(/\s+/, 1)[0];
+  if (word === undefined) {
+    return [NULL_RESULT, line];
+  }
+  if (numberParser(word)[1] === "") { // 数字として読めるのはいけない。
+    return [NULL_RESULT, line];
+  }
+  if ((OPERATORS as readonly string[]).includes(word)) { // 組み込み演算子の上書きはいけない。
+    return [NULL_RESULT, line];
+  }
+  if (!(word in words)) {
+    words[word] = [];
+  }
+  return [{type: "NewWord", value: word}, trimmed.substring(word.length)];
+} 
+
 /**
  * 与えられた{@link Parser}を一つずつ試していき、うまくいったものがあればその結果を返し、
  * 全てうまくいかなかったら失敗にする{@link Parser}を作る。
@@ -151,9 +196,9 @@ export const makeOrParser = (parsers: Parser[]): Parser => {
 };
 
 /**
- * 浮動小数点数、整数、文字列の順に取得しようとする{@link Parser}
+ * 浮動小数点数、整数の順に取得しようとする{@link Parser}
  */
-export const valueParser = makeOrParser([floatParser, integerParser, stringParser]);
+export const numberParser = makeOrParser([floatParser, integerParser]);
 
 const makeOperatorParser = (operator: Operator): Parser => {
   return (line) => {
@@ -172,9 +217,9 @@ const OPERATOR_PARSERS = OPERATORS.map((operator) =>
 export const operatorsParser = makeOrParser(OPERATOR_PARSERS);
 
 /**
- * まず数を取得しようとし、その後演算子を取得しようとするパーサー
+ * まずワード、次に数、その後文字列、そして演算子、最後に新しいワードを取得しようとするパーサー
  */
-export const tokenParser = makeOrParser([valueParser, operatorsParser]);
+export const tokenParser = makeOrParser([wordParser, numberParser, stringParser, operatorsParser, newWordParser]);
 
 type ArrayResylt = SuccessResult[] | null;
 
@@ -192,6 +237,7 @@ export const makeArrayParser = (
     }
     const [result, rest] = parser(line.trim());
     if (result.type === "Null") {
+      console.warn("error before:" + rest);
       return null;
     }
     const arrayResult = arrayParser(rest);
@@ -231,8 +277,15 @@ export const CODE_LOOP = -18;
 export const CODE_PRINT = -19;
 export const CODE_INDEX = -20;
 export const CODE_DUP = -21;
-export const CODE_CR = -22;
-export const CODE_PLACEFOLDER = -23;
+export const CODE_SWAP = -22;
+export const CODE_DROP = -23;
+export const CODE_ROT = -24;
+export const CODE_MROT = -25;
+export const CODE_OVER = -26;
+export const CODE_CR = -27;
+export const CODE_CALL = -28;
+export const CODE_RETURN = -29;
+export const CODE_PLACEFOLDER = -30;
 
 const branchStack: number[] = [];
 
@@ -240,151 +293,225 @@ export const inBranch = () => {
   return branchStack.length > 0;
 };
 
+export type Instruction = string | number;
+
 export const instructionsParser = (
   line: string,
   instructions: (number | string)[]
-): (number | string)[] | null => {
+): Instruction[] | null => {
+  const savedWords = {...words};
   const tokens = tokenizer(line);
   if (tokens === null) {
+    console.warn("tokenize failed");
     return null;
   }
   let programCounter = instructions.length;
+  let currentWord: string | null = null;
   for (const token of tokens) {
+    const currentInstructions = currentWord !== null ? words[currentWord] : instructions;
     switch (token.type) {
       case "Integer":
       case "Float":
       case "String":
-        instructions.push(CODE_PUSH, token.value);
+        currentInstructions.push(CODE_PUSH, token.value);
         programCounter += 2;
         break;
+      case "NewWord": {
+        if (inBranch()) {
+          console.warn("you can define function only at top");
+          words = savedWords;
+          return null;
+        }
+        branchStack.push(programCounter);
+        programCounter = 0;
+        const word = token.value;
+        currentWord = word;
+        break;
+      }
+      case "Word": {
+        const word = token.value;
+        currentInstructions.push(CODE_CALL);
+        currentInstructions.push(word);
+        programCounter += 2;
+        break;
+      }
       case "Operator":
         switch (token.value) {
           case "if":
-            instructions.push(CODE_IF);
-            instructions.push(CODE_PLACEFOLDER);
+            currentInstructions.push(CODE_IF);
+            currentInstructions.push(CODE_PLACEFOLDER);
             branchStack.push(programCounter + 1);
             programCounter += 2;
             break;
           case "else": {
-            instructions.push(CODE_ELSE);
             const idx = branchStack.pop();
             if (idx === undefined) {
+              console.warn("not inside if block");
+              words = savedWords;
               return null;
             }
-            instructions[idx] = programCounter + 2;
-            instructions.push(CODE_PLACEFOLDER);
+            currentInstructions.push(CODE_ELSE);
+            currentInstructions[idx] = programCounter + 2;
+            currentInstructions.push(CODE_PLACEFOLDER);
             branchStack.push(programCounter + 1);
             programCounter += 2;
             break;
           }
           case "then": {
-            instructions.push(CODE_THEN);
             const idx = branchStack.pop();
             if (idx === undefined) {
+              console.warn("not inside if block");
+              words = savedWords;
               return null;
             }
-            instructions[idx] = programCounter + 1;
+            currentInstructions.push(CODE_THEN);
+            currentInstructions[idx] = programCounter + 1;
             programCounter++;
             break;
           }
           case "do": {
-            instructions.push(CODE_DO);
+            currentInstructions.push(CODE_DO);
             branchStack.push(programCounter + 1);
             programCounter++;
             break;
           }
-          case "loop": {
-            instructions.push(CODE_LOOP);
+          case "loop": {            
             const idx = branchStack.pop();
             if (idx === undefined) {
+              console.warn("not inside do loop");
+              words = savedWords;
               return null;
             }
-            instructions.push(idx);
+            currentInstructions.push(CODE_LOOP);
+            currentInstructions.push(idx);
             programCounter += 2;
             break;
           }
           case "+": {
-            instructions.push(CODE_PLUS);
+            currentInstructions.push(CODE_PLUS);
             programCounter++;
             break;
           }
           case "-": {
-            instructions.push(CODE_MINUS);
+            currentInstructions.push(CODE_MINUS);
             programCounter++;
             break;
           }
           case "*": {
-            instructions.push(CODE_MULT);
+            currentInstructions.push(CODE_MULT);
             programCounter++;
             break;
           }
           case "/": {
-            instructions.push(CODE_DIV);
+            currentInstructions.push(CODE_DIV);
             programCounter++;
             break;
           }
           case "%": {
-            instructions.push(CODE_MOD);
+            currentInstructions.push(CODE_MOD);
             programCounter++;
             break;
           }
           case "^": {
-            instructions.push(CODE_POW);
+            currentInstructions.push(CODE_POW);
             programCounter++;
             break;
           }
           case "=": {
-            instructions.push(CODE_EQUAL);
+            currentInstructions.push(CODE_EQUAL);
             programCounter++;
             break;
           }
           case "<=": {
-            instructions.push(CODE_LEQ);
+            currentInstructions.push(CODE_LEQ);
             programCounter++;
             break;
           }
           case "<": {
-            instructions.push(CODE_LESS);
+            currentInstructions.push(CODE_LESS);
             programCounter++;
             break;
           }
           case ">=": {
-            instructions.push(CODE_GEQ);
+            currentInstructions.push(CODE_GEQ);
             programCounter++;
             break;
           }
           case ">": {
-            instructions.push(CODE_GREAT);
+            currentInstructions.push(CODE_GREAT);
             programCounter++;
             break;
           }
           case ".": {
-            instructions.push(CODE_PRINT);
+            currentInstructions.push(CODE_PRINT);
             programCounter++;
             break;
           }
           case "cr": {
-            instructions.push(CODE_CR);
+            currentInstructions.push(CODE_CR);
             programCounter++;
             break;
           }
           case "i": {
-            instructions.push(CODE_INDEX);
+            currentInstructions.push(CODE_INDEX);
             programCounter++;
             break;
           }
           case "dup": {
-            instructions.push(CODE_DUP);
+            currentInstructions.push(CODE_DUP);
+            programCounter++;
+            break;
+          }
+          case "swap": {
+            currentInstructions.push(CODE_SWAP);
+            programCounter++;
+            break;
+          }
+          case "drop": {
+            currentInstructions.push(CODE_DROP);
+            programCounter++;
+            break;
+          }
+          case "rot": {
+            currentInstructions.push(CODE_ROT);
+            programCounter++;
+            break;
+          }
+          case "-rot": {
+            currentInstructions.push(CODE_MROT);
+            programCounter++;
+            break;
+          }
+          case "over": {
+            currentInstructions.push(CODE_OVER);
             programCounter++;
             break;
           }
           case "e": {
-            instructions.push(CODE_IMAGINARY);
+            currentInstructions.push(CODE_IMAGINARY);
             programCounter++;
             break;
           }
+          case ";": {
+            const idx = branchStack.pop();
+            if (idx === undefined) {
+              console.warn("not inside function block");
+              words = savedWords;
+              return null;
+            }
+            if (inBranch()) {
+              console.warn("unclosed if block or do loop");
+              words = savedWords;
+              return null;
+            }
+            currentInstructions.push(CODE_RETURN);
+            programCounter = idx; 
+            currentWord = null;
+            break;
+          }          
         }
     }
   }
+  instructions.push(CODE_END);
   return instructions;
 };

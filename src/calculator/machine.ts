@@ -11,11 +11,14 @@ import {
 } from "../infinitenion/infinitenion";
 import { isInteger, isNonNegativeInteger } from "../infinitenion/integer";
 import {
+  CODE_CALL,
   CODE_CR,
   CODE_DIV,
   CODE_DO,
+  CODE_DROP,
   CODE_DUP,
   CODE_ELSE,
+  CODE_END,
   CODE_EQUAL,
   CODE_GEQ,
   CODE_GREAT,
@@ -27,15 +30,22 @@ import {
   CODE_LOOP,
   CODE_MINUS,
   CODE_MOD,
+  CODE_MROT,
   CODE_MULT,
+  CODE_OVER,
   CODE_PLACEFOLDER,
   CODE_PLUS,
   CODE_POW,
   CODE_PRINT,
   CODE_PUSH,
+  CODE_RETURN,
+  CODE_ROT,
+  CODE_SWAP,
   CODE_THEN,
   inBranch,
+  Instruction,
   instructionsParser,
+  words,
 } from "./parser";
 
 type Stack = (Infinitenion | string)[];
@@ -59,6 +69,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
   const loopEndStack: number[] = [];
   const saved = [...stack];
   const instructions = instructionsParser(line, formerInstructions);
+  const callStack: {name: string | null, programCounter: number}[] = [];
+  let currentName: string | null = null;
   if (instructions === null) {
     console.warn("parse error: " + line);
     formerInstructions = [];
@@ -70,13 +82,14 @@ export const evaluate = (line: string, stack: Stack): Stack => {
     formerInstructions = [];
   }
   let programCounter = 0;
-  while (programCounter < instructions.length) {
-    const instruction = instructions[programCounter];
+  while (programCounter >= 0) {
+    const currentInstructions: Instruction[] = currentName !== null ? words[currentName] : instructions;
+    const instruction = currentInstructions[programCounter];
     switch (instruction) {
       case CODE_IF: {
         const condition = stack.pop();
         if (condition === 0) {
-          const jump = instructions[programCounter + 1];
+          const jump = currentInstructions[programCounter + 1];
           if (typeof jump === "number") {
             programCounter = jump;
           } else {
@@ -89,7 +102,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         break;
       }
       case CODE_ELSE: {
-        const jump = instructions[programCounter + 1];
+        const jump = currentInstructions[programCounter + 1];
         if (typeof jump == "number") {
             programCounter = jump;
         } else {
@@ -132,7 +145,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           loopEndStack.pop();
           programCounter += 2;
         } else {
-            const jump = instructions[programCounter + 1];
+            const jump = currentInstructions[programCounter + 1];
             if (typeof jump === "number") {
                 programCounter = jump;
             } else {
@@ -153,7 +166,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         break;
       }
       case CODE_PUSH: {
-        const value = instructions[programCounter + 1];
+        const value = currentInstructions[programCounter + 1];
         pushStack(value, stack);
         programCounter += 2;
         break;
@@ -163,6 +176,10 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
           console.warn("stack underflow!\n");
+          console.warn(stackToString(stack));
+          console.warn(instruction);
+          console.warn(currentName);
+          console.warn(programCounter);
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
@@ -271,6 +288,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
           console.warn("stack underflow!\n");
+          console.warn(stackToString(stack));
+          console.warn(instruction);
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
@@ -289,6 +308,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
           console.warn("stack underflow!\n");
+          console.warn(stackToString(stack));
+          console.warn(instruction);
           return saved;
         }
         if (typeof i1 !== "number" || typeof i2 !== "number") {
@@ -349,13 +370,73 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         break;
       }
       case CODE_DUP: {
-        const i1 = stack.pop();
+        const i1 = stack[stack.length - 1];
         if (i1 === undefined) {
+          console.warn("stack underflow!\n");
+          console.warn(stackToString(stack));
+          console.warn(instruction);
+          return saved;
+        }
+        stack.push(i1);
+        programCounter++;
+        break;
+      }
+      case CODE_DROP: {
+        stack.pop();
+        programCounter++;
+        break;
+      }
+      case CODE_SWAP: {
+        const i1 = stack.pop();
+        const i2 = stack.pop();
+        if (i1 === undefined || i2 === undefined) {
+          console.warn("stack underflow!\n");
+          console.warn(stackToString(stack));
+          console.warn(instruction);
+          return saved;
+        }
+        stack.push(i1);
+        stack.push(i2);
+        programCounter++;
+        break;
+      }
+      case CODE_ROT: {
+        const i1 = stack.pop();
+        const i2 = stack.pop();
+        const i3 = stack.pop();
+        if (i1 === undefined || i2 === undefined || i3 === undefined) {
+          console.warn("stack underflow!\n");
+          return saved;
+        }
+        stack.push(i2);
+        stack.push(i1);
+        stack.push(i3);
+        programCounter++;
+        break;
+      }
+      case CODE_MROT: {
+        const i1 = stack.pop();
+        const i2 = stack.pop();
+        const i3 = stack.pop();
+        if (i1 === undefined || i2 === undefined || i3 === undefined) {
           console.warn("stack underflow!\n");
           return saved;
         }
         stack.push(i1);
-        stack.push(i1);
+        stack.push(i3);
+        stack.push(i2);
+        programCounter++;
+        break;
+      }
+      case CODE_OVER: {
+        const item = stack[stack.length - 2];
+        if (item === undefined) {
+          console.warn("stack underflow!\n");
+          console.warn(stackToString(stack));
+          console.warn(instruction);
+          return saved;
+        }
+        stack.push(item);
         programCounter++;
         break;
       }
@@ -393,9 +474,32 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         programCounter++;
         break;
       }
+      case CODE_CALL: {
+        const name = currentInstructions[programCounter + 1];
+        if (typeof name !== "string") {
+          console.warn("invalid state");
+          return saved;
+        }
+        callStack.push({name: currentName, programCounter});
+        currentName = name;
+        programCounter = 0;
+        break;
+      }
+      case CODE_RETURN: {
+        const callData = callStack.pop();
+        if (callData === undefined) {
+          console.warn("invalid state");
+          return saved;
+        }
+        currentName = callData.name;
+        programCounter = callData.programCounter + 2;
+        break;
+      } 
+      case CODE_END:
+        return stack;
       case CODE_PLACEFOLDER:
       default: {
-        console.warn(`invalid state: ${instructions}\n`);
+        console.warn(`invalid state: ${instructions}`);
         return saved;
       }
     }

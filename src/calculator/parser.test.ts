@@ -1,4 +1,4 @@
-import { floatParser, integerParser, valueParser, stringParser, tokenizer } from "./parser";
+import { floatParser, integerParser, numberParser, stringParser, tokenizer } from "./parser";
 
 test("parse int", () => {
   const [result, rest] = integerParser("123abc");
@@ -40,27 +40,27 @@ test("parse float", () => {
 });
 
 test("parse number", () => {
-  const [result, rest] = valueParser("123abc");
+  const [result, rest] = numberParser("123abc");
   expect(result.type).toBe("Integer");
   expect(result.value).toBe(123);
   expect(rest).toBe("abc");
 
-  const [result2, rest2] = valueParser("123.456def");
+  const [result2, rest2] = numberParser("123.456def");
   expect(result2.type).toBe("Float");
   expect(result2.value).toBe(123.456);
   expect(rest2).toBe("def");
 
-  const [result3, rest3] = valueParser("5.274e-4ghi");
+  const [result3, rest3] = numberParser("5.274e-4ghi");
   expect(result3.type).toBe("Float");
   expect(result3.value).toBe(5.274e-4);
   expect(rest3).toBe("ghi");
 
-  const [result4, rest4] = valueParser("abc123.4");
+  const [result4, rest4] = numberParser("abc123.4");
   expect(result4.type).toBe("Null");
   expect(result4.value).toBeNull();
   expect(rest4).toBe("abc123.4");
 
-  const [result5, rest5] = valueParser("123.0jkl");
+  const [result5, rest5] = numberParser("123.0jkl");
   expect(result5.type).toBe("Float");
   expect(result5.value).toBe(123.0);
   expect(rest5).toBe("jkl");
