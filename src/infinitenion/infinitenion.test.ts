@@ -162,22 +162,22 @@ test("infinitenion to string", () => {
     infinitenionToString(makeRational(2 as Integer, 3 as Integer) as Rational)
   ).toBe("2 3 /");
   expect(infinitenionToString(nthImaginary(1 as NonNegativeInteger))).toBe(
-    "1 i"
+    "1 e"
   );
   expect(infinitenionToString(nthImaginary(2 as NonNegativeInteger))).toBe(
-    "2 i"
+    "2 e"
   );
   expect(infinitenionToString(nthImaginary(3 as NonNegativeInteger))).toBe(
-    "3 i"
+    "3 e"
   );
   expect(infinitenionToString(nthImaginary(10 as NonNegativeInteger))).toBe(
-    "10 i"
+    "10 e"
   );
   expect(
     infinitenionToString(
       addInfinitenion(1, nthImaginary(10 as NonNegativeInteger))
     )
-  ).toBe("1 10 i +");
+  ).toBe("1 10 e +");
   expect(
     infinitenionToString(
       addInfinitenion(
@@ -188,5 +188,5 @@ test("infinitenion to string", () => {
         )
       )
     )
-  ).toBe("1 1 2 / 10 i * +");
+  ).toBe("1 1 2 / 10 e * +");
 });

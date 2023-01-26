@@ -338,9 +338,9 @@ export const infinitenionToString = (a: Infinitenion, nth = 0): string => {
       return baseToString(a);
     }
     if (a === 1) {
-      return `${nth} i`;
+      return `${nth} e`;
     }
-    return `${baseToString(a)} ${nth} i *`;
+    return `${baseToString(a)} ${nth} e *`;
   }
   const offset = Math.pow(2, a.height - 1);
   if (a.real === 0) {

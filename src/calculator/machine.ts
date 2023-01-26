@@ -12,6 +12,7 @@ import {
 import { isInteger, isNonNegativeInteger } from "../infinitenion/integer";
 import {
   CODE_CALL,
+  CODE_CLEAR,
   CODE_CR,
   CODE_DIV,
   CODE_DO,
@@ -43,9 +44,10 @@ import {
   CODE_SWAP,
   CODE_THEN,
   inBranch,
-  Instruction,
   instructionsParser,
-  words,
+  environment,
+  resolveCurrentInstructions,
+  CODE_BIND,
 } from "./parser";
 
 type Stack = (Infinitenion | string)[];
@@ -83,7 +85,10 @@ export const evaluate = (line: string, stack: Stack): Stack => {
   }
   let programCounter = 0;
   while (programCounter >= 0) {
-    const currentInstructions: Instruction[] = currentName !== null ? words[currentName] : instructions;
+    const currentInstructions = resolveCurrentInstructions(currentName, instructions);
+    if (currentInstructions === null) {
+      return saved;
+    }
     const instruction = currentInstructions[programCounter];
     switch (instruction) {
       case CODE_IF: {
@@ -183,7 +188,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
-            stack.push(i1 + i2);
+            stack.push(i2 + i1);
         } else if (typeof i1 === "string" || typeof i2 === "string") {
             console.warn("can not add string and infinitenion");
             return saved;
@@ -440,6 +445,11 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         programCounter++;
         break;
       }
+      case CODE_CLEAR: {
+        stack.splice(0);
+        programCounter++;
+        break;
+      }
       case CODE_CR: {
         process.stdin.write("\n");
         programCounter++;
@@ -474,15 +484,44 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         programCounter++;
         break;
       }
+      case CODE_BIND: {
+        const n = stack.pop();
+        if (n === undefined) {
+          console.warn("stack underflow!\n");
+          return saved;
+        }
+        const name = currentInstructions[programCounter + 1];
+        if (typeof name !== "string") {
+          console.warn("invalid state");
+          return saved;
+        }
+        if (typeof n === "string") {
+          environment[name] = {type: "String", value: n};
+        } else {
+          environment[name] = {type: "Infinitenion", value: n}
+        }
+        programCounter += 2;
+        break;
+      }
       case CODE_CALL: {
         const name = currentInstructions[programCounter + 1];
         if (typeof name !== "string") {
           console.warn("invalid state");
           return saved;
         }
-        callStack.push({name: currentName, programCounter});
-        currentName = name;
-        programCounter = 0;
+        const value = environment[name];
+        if (value === undefined) {
+          console.warn("undefined variable:" + name);
+          return saved;
+        }
+        if (value.type === "Executable") {
+          callStack.push({name: currentName, programCounter});
+          currentName = name;
+          programCounter = 0;
+        } else {
+          stack.push(value.value);
+          programCounter += 2;
+        }
         break;
       }
       case CODE_RETURN: {

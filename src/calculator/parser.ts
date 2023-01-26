@@ -1,3 +1,4 @@
+import { Infinitenion } from "../infinitenion/infinitenion";
 import { Integer } from "../infinitenion/integer";
 
 /**
@@ -43,8 +44,12 @@ type WordResult = {
   value: string;
 };
 
-type NewWordResult = {
-  type: "NewWord";
+type FunctionResult = {
+  type: "Function";
+  value: string;
+};
+type VariableResult = {
+  type: "Variable";
   value: string;
 };
 
@@ -60,6 +65,7 @@ const OPERATORS = [
   "rot",
   "-rot",
   "over",
+  "clear",
   "+",
   "-",
   "*",
@@ -93,7 +99,7 @@ const OPERATOR_RESULTS = OPERATORS.reduce((acc, value) => {
 /**
  * 成功
  */
-export type SuccessResult = IntegerResult | FloatResult | StringResult | WordResult | NewWordResult | OperatorResult;
+export type SuccessResult = IntegerResult | FloatResult | StringResult | WordResult | FunctionResult | VariableResult | OperatorResult;
 export type Result = NullResult | SuccessResult;
 /**
  * 文字列をパースして結果と残りの文字列を返す関数
@@ -148,17 +154,32 @@ export const stringParser: Parser = (line) => {
     return [{type: "String", value: result}, rest];
 }
 
-export let words: {[key: string]: Instruction[]} = {};
+type ExcecutableValue = {
+  type: "Executable",
+  value: Instruction[],
+};
+type InfinitenionValue = {
+  type: "Infinitenion",
+  value: Infinitenion
+};
+type StringValue = {
+  type: "String",
+  value: string,
+};
+
+type Value = ExcecutableValue | InfinitenionValue | StringValue | undefined;
+type Environment = {[key: string]: Value};
+export let environment: Environment = {};
 
 export const wordParser: Parser = (line) => {
   const word = line.split(/\s+/, 1)[0];
-  if (word in words) {
+  if (word in environment) {
     return [{type: "Word", value: word}, line.substring(word.length)];
   }
   return [NULL_RESULT, line];
 }
 
-export const newWordParser: Parser = (line) => {
+export const functionParser: Parser = (line) => {
   if (!line.startsWith(":")) {
     return [NULL_RESULT, line];
   }
@@ -173,11 +194,32 @@ export const newWordParser: Parser = (line) => {
   if ((OPERATORS as readonly string[]).includes(word)) { // 組み込み演算子の上書きはいけない。
     return [NULL_RESULT, line];
   }
-  if (!(word in words)) {
-    words[word] = [];
+  if (!(word in environment)) {
+    environment[word] = undefined;
   }
-  return [{type: "NewWord", value: word}, trimmed.substring(word.length)];
-} 
+  return [{type: "Function", value: word}, trimmed.substring(word.length)];
+}
+
+export const variableParser: Parser = (line) => {
+  if (!line.startsWith("!")) {
+    return [NULL_RESULT, line];
+  }
+  const trimmed = line.substring(1).trim();
+  const word = trimmed.split(/\s+/, 1)[0];
+  if (word === undefined) {
+    return [NULL_RESULT, line];
+  }
+  if (numberParser(word)[1] === "") { // 数字として読めるのはいけない。
+    return [NULL_RESULT, line];
+  }
+  if ((OPERATORS as readonly string[]).includes(word)) { // 組み込み演算子の上書きはいけない。
+    return [NULL_RESULT, line];
+  }
+  if (!(word in environment)) {
+    environment[word] = undefined;
+  }
+  return [{type: "Variable", value: word}, trimmed.substring(word.length)];
+}
 
 /**
  * 与えられた{@link Parser}を一つずつ試していき、うまくいったものがあればその結果を返し、
@@ -219,7 +261,7 @@ export const operatorsParser = makeOrParser(OPERATOR_PARSERS);
 /**
  * まずワード、次に数、その後文字列、そして演算子、最後に新しいワードを取得しようとするパーサー
  */
-export const tokenParser = makeOrParser([wordParser, numberParser, stringParser, operatorsParser, newWordParser]);
+export const tokenParser = makeOrParser([wordParser, numberParser, stringParser, operatorsParser, functionParser, variableParser]);
 
 type ArrayResylt = SuccessResult[] | null;
 
@@ -282,10 +324,12 @@ export const CODE_DROP = -23;
 export const CODE_ROT = -24;
 export const CODE_MROT = -25;
 export const CODE_OVER = -26;
-export const CODE_CR = -27;
-export const CODE_CALL = -28;
-export const CODE_RETURN = -29;
-export const CODE_PLACEFOLDER = -30;
+export const CODE_CLEAR = -27;
+export const CODE_CR = -28;
+export const CODE_CALL = -29;
+export const CODE_BIND = -30
+export const CODE_RETURN = -31;
+export const CODE_PLACEFOLDER = -32;
 
 const branchStack: number[] = [];
 
@@ -293,13 +337,29 @@ export const inBranch = () => {
   return branchStack.length > 0;
 };
 
-export type Instruction = string | number;
+export type Instruction = number | string;
+
+export const resolveCurrentInstructions = (currentWord: string | null, instructions: Instruction[]): Instruction[] | null => {
+  if (currentWord === null) {
+    return instructions;
+  }
+  const currentInstructions = environment[currentWord];
+  if (currentInstructions === undefined) {
+      console.warn("Invalid State");
+      return null;
+  }
+  if (currentInstructions.type === "Infinitenion" || currentInstructions.type === "String") {
+      console.warn("Invalid State");
+      return null;
+  }
+  return currentInstructions.value;
+}
 
 export const instructionsParser = (
   line: string,
   instructions: (number | string)[]
 ): Instruction[] | null => {
-  const savedWords = {...words};
+  const savedWords = {...environment};
   const tokens = tokenizer(line);
   if (tokens === null) {
     console.warn("tokenize failed");
@@ -308,7 +368,10 @@ export const instructionsParser = (
   let programCounter = instructions.length;
   let currentWord: string | null = null;
   for (const token of tokens) {
-    const currentInstructions = currentWord !== null ? words[currentWord] : instructions;
+    const currentInstructions = resolveCurrentInstructions(currentWord, instructions);
+    if (currentInstructions === null) {
+      return null;
+    }
     switch (token.type) {
       case "Integer":
       case "Float":
@@ -316,16 +379,27 @@ export const instructionsParser = (
         currentInstructions.push(CODE_PUSH, token.value);
         programCounter += 2;
         break;
-      case "NewWord": {
+      case "Function": {
         if (inBranch()) {
           console.warn("you can define function only at top");
-          words = savedWords;
+          environment = savedWords;
           return null;
         }
         branchStack.push(programCounter);
         programCounter = 0;
         const word = token.value;
         currentWord = word;
+        break;
+      }
+      case "Variable": {
+        if (inBranch()) {
+          console.warn("you can define variable only at top");
+          environment = savedWords;
+          return null;
+        }
+        currentInstructions.push(CODE_BIND);
+        currentInstructions.push(token.value);
+        programCounter += 2;
         break;
       }
       case "Word": {
@@ -347,7 +421,7 @@ export const instructionsParser = (
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside if block");
-              words = savedWords;
+              environment = savedWords;
               return null;
             }
             currentInstructions.push(CODE_ELSE);
@@ -361,7 +435,7 @@ export const instructionsParser = (
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside if block");
-              words = savedWords;
+              environment = savedWords;
               return null;
             }
             currentInstructions.push(CODE_THEN);
@@ -379,7 +453,7 @@ export const instructionsParser = (
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside do loop");
-              words = savedWords;
+              environment = savedWords;
               return null;
             }
             currentInstructions.push(CODE_LOOP);
@@ -487,6 +561,11 @@ export const instructionsParser = (
             programCounter++;
             break;
           }
+          case "clear": {
+            currentInstructions.push(CODE_CLEAR);
+            programCounter++;
+            break;
+          }
           case "e": {
             currentInstructions.push(CODE_IMAGINARY);
             programCounter++;
@@ -496,12 +575,12 @@ export const instructionsParser = (
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside function block");
-              words = savedWords;
+              environment = savedWords;
               return null;
             }
             if (inBranch()) {
               console.warn("unclosed if block or do loop");
-              words = savedWords;
+              environment = savedWords;
               return null;
             }
             currentInstructions.push(CODE_RETURN);
