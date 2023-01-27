@@ -62,7 +62,9 @@ export const pushStack = (x: Infinitenion | string, stack: Stack): Stack => {
   return stack;
 };
 
-export const popStack = (stack: Stack): [Infinitenion | string | undefined, Stack] => {
+export const popStack = (
+  stack: Stack
+): [Infinitenion | string | undefined, Stack] => {
   const x = stack.pop();
   return [x, stack];
 };
@@ -74,7 +76,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
   const loopEndStack: number[] = [];
   const saved = [...stack];
   const instructions = instructionsParser(line, formerInstructions);
-  const callStack: {name: string | null, programCounter: number}[] = [];
+  const callStack: { name: string | null; programCounter: number }[] = [];
   let currentName: string | null = null;
   if (instructions === null) {
     console.warn("parse error: " + line);
@@ -88,7 +90,10 @@ export const evaluate = (line: string, stack: Stack): Stack => {
   }
   let programCounter = 0;
   while (programCounter >= 0) {
-    const currentInstructions = resolveCurrentInstructions(currentName, instructions);
+    const currentInstructions = resolveCurrentInstructions(
+      currentName,
+      instructions
+    );
     if (currentInstructions === null) {
       return saved;
     }
@@ -113,11 +118,11 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_ELSE: {
         const jump = currentInstructions[programCounter + 1];
         if (typeof jump == "number") {
-            programCounter = jump;
+          programCounter = jump;
         } else {
-            console.warn("invalid jump:" + jump);
-            setEnvironment();
-            return saved;
+          console.warn("invalid jump:" + jump);
+          setEnvironment();
+          return saved;
         }
         break;
       }
@@ -158,14 +163,14 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           loopEndStack.pop();
           programCounter += 2;
         } else {
-            const jump = currentInstructions[programCounter + 1];
-            if (typeof jump === "number") {
-                programCounter = jump;
-            } else {
-                console.warn("invalid jump:" + jump);
-                setEnvironment();
-                return saved;
-            }
+          const jump = currentInstructions[programCounter + 1];
+          if (typeof jump === "number") {
+            programCounter = jump;
+          } else {
+            console.warn("invalid jump:" + jump);
+            setEnvironment();
+            return saved;
+          }
         }
         break;
       }
@@ -195,13 +200,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
-            stack.push(i2 + i1);
+          stack.push(i2 + i1);
         } else if (typeof i1 === "string" || typeof i2 === "string") {
-            console.warn("can not add string and infinitenion");
-            setEnvironment();
-            return saved;
+          console.warn("can not add string and infinitenion");
+          setEnvironment();
+          return saved;
         } else {
-            stack.push(addInfinitenion(i2, i1));
+          stack.push(addInfinitenion(i2, i1));
         }
         programCounter++;
         break;
@@ -215,9 +220,9 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 === "string" || typeof i2 === "string") {
-            console.warn("only infinitenion can substract");
-            setEnvironment();
-            return saved;
+          console.warn("only infinitenion can substract");
+          setEnvironment();
+          return saved;
         }
         stack.push(subInfinitenion(i2, i1));
         programCounter++;
@@ -232,9 +237,9 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 === "string" || typeof i2 === "string") {
-            console.warn("only infinitenion can multiply");
-            setEnvironment();
-            return saved;
+          console.warn("only infinitenion can multiply");
+          setEnvironment();
+          return saved;
         }
         stack.push(mulInfinitenion(i2, i1));
         programCounter++;
@@ -249,9 +254,9 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 === "string" || typeof i2 === "string") {
-            console.warn("only infinitenion can divide");
-            setEnvironment();
-            return saved;
+          console.warn("only infinitenion can divide");
+          setEnvironment();
+          return saved;
         }
         const result = divInfinitenion(i2, i1);
         if (result === null) {
@@ -288,10 +293,11 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           console.warn("stack underflow!");
           setEnvironment();
           return saved;
-        }if (typeof i2 === "string") {
-            console.warn("only infinitenion can exponent");
-            setEnvironment();
-            return saved;
+        }
+        if (typeof i2 === "string") {
+          console.warn("only infinitenion can exponent");
+          setEnvironment();
+          return saved;
         }
         if (typeof i1 === "number" && isInteger(i1)) {
           const result = powInfinitenion(i2, i1);
@@ -318,13 +324,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
-            stack.push(i1 === i2 ? 1 : 0);
+          stack.push(i1 === i2 ? 1 : 0);
         } else if (typeof i1 === "string" || typeof i2 === "string") {
-            console.warn("can not compare infinitenion and string");
-            setEnvironment();
-            return saved;
+          console.warn("can not compare infinitenion and string");
+          setEnvironment();
+          return saved;
         } else {
-            stack.push(equalInfinitenion(i1, i2));
+          stack.push(equalInfinitenion(i1, i2));
         }
         programCounter++;
         break;
@@ -506,9 +512,9 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         if (typeof n === "string") {
-            process.stdin.write(n);
+          process.stdin.write(n);
         } else {
-            process.stdin.write(infinitenionToString(n));
+          process.stdin.write(infinitenionToString(n));
         }
         programCounter++;
         break;
@@ -527,15 +533,16 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         const environment = findEnvironment(word);
-        if (environment === null) { // 正しく実装されてればコンパイル時にチェック済み
+        if (environment === null) {
+          // 正しく実装されてればコンパイル時にチェック済み
           console.warn("invalid state! undefined word:" + word);
           setEnvironment();
           return saved;
         }
         if (typeof n === "string") {
-          environment.values[word] = {type: "String", value: n};
+          environment.values[word] = { type: "String", value: n };
         } else {
-          environment.values[word] = {type: "Infinitenion", value: n}
+          environment.values[word] = { type: "Infinitenion", value: n };
         }
         programCounter += 2;
         break;
@@ -547,23 +554,25 @@ export const evaluate = (line: string, stack: Stack): Stack => {
           return saved;
         }
         const environment = findEnvironment(word);
-        if (environment === null) { // 正しく実装されてればコンパイル時にチェック済み（いや、そんなことないかも！ ローカル変数を定義する前にアクセスしたら起こる）
+        if (environment === null) {
+          // 正しく実装されてればコンパイル時にチェック済み（いや、そんなことないかも！ ローカル変数を定義する前にアクセスしたら起こる）
           console.warn("invalid state! undefined word:" + word);
           setEnvironment();
           return saved;
         }
         const value = environment.values[word];
-        if (value === undefined) { // TODO 本当はこのチェックは上でやったことと同じなのでいらないはず
+        if (value === undefined) {
+          // TODO 本当はこのチェックは上でやったことと同じなのでいらないはず
           console.warn("invalid state! undefined word!:" + word);
           setEnvironment();
           return saved;
         }
         if (value.type === "Executable") {
-          callStack.push({name: currentName, programCounter});
+          callStack.push({ name: currentName, programCounter });
           currentName = word;
           const newEnvironment: Environment = {
             parent: currentEnvironment,
-            values: {...environment.values}
+            values: { ...environment.values },
           };
           setEnvironment(newEnvironment);
           programCounter = 0;
@@ -590,7 +599,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         setEnvironment(parent);
         programCounter = callData.programCounter + 2;
         break;
-      } 
+      }
       case CODE_END:
         return stack;
       case CODE_PLACEFOLDER:
@@ -606,5 +615,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
 };
 
 export const stackToString = (stack: Stack): string => {
-  return "[" + stack.map((val) => typeof val == "string" ? JSON.stringify(val) : infinitenionToString(val)).join(",") + "]";
+  return (
+    "[" +
+    stack
+      .map((val) =>
+        typeof val == "string" ? JSON.stringify(val) : infinitenionToString(val)
+      )
+      .join(",") +
+    "]"
+  );
 };

@@ -1,4 +1,10 @@
-import { floatParser, integerParser, numberParser, stringParser, tokenizer } from "./parser";
+import {
+  floatParser,
+  integerParser,
+  numberParser,
+  stringParser,
+  tokenizer,
+} from "./parser";
 
 test("parse int", () => {
   const [result, rest] = integerParser("123abc");
@@ -67,15 +73,15 @@ test("parse number", () => {
 });
 
 test("parse string", () => {
-    const [result, rest] = stringParser("\"abc\"+123");
-    expect(result.type).toBe("String");
-    expect(result.value).toBe("abc");
-    expect(rest).toBe("+123");
-    const [result2, rest2] = stringParser("\"ab\\nc\"+123");
-    expect(result2.type).toBe("String");
-    expect(result2.value).toBe("ab\nc");
-    expect(rest2).toBe("+123");
-})
+  const [result, rest] = stringParser('"abc"+123');
+  expect(result.type).toBe("String");
+  expect(result.value).toBe("abc");
+  expect(rest).toBe("+123");
+  const [result2, rest2] = stringParser('"ab\\nc"+123');
+  expect(result2.type).toBe("String");
+  expect(result2.value).toBe("ab\nc");
+  expect(rest2).toBe("+123");
+});
 
 test("tokens parser", () => {
   const result = tokenizer("+123.456 12+ 123-");
