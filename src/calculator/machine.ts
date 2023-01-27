@@ -45,9 +45,12 @@ import {
   CODE_THEN,
   inBranch,
   instructionsParser,
-  environment,
   resolveCurrentInstructions,
   CODE_BIND,
+  findEnvironment,
+  Environment,
+  currentEnvironment,
+  setEnvironment,
 } from "./parser";
 
 type Stack = (Infinitenion | string)[];
@@ -99,6 +102,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
             programCounter = jump;
           } else {
             console.warn("invalid jump:" + jump);
+            setEnvironment();
             return saved;
           }
         } else {
@@ -112,6 +116,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
             programCounter = jump;
         } else {
             console.warn("invalid jump:" + jump);
+            setEnvironment();
             return saved;
         }
         break;
@@ -124,15 +129,18 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 !== "number") {
           console.warn("not integer loop start");
+          setEnvironment();
           return saved;
         }
         if (typeof i2 !== "number") {
           console.warn("not integer loop start");
+          setEnvironment();
           return saved;
         }
         loopCountStack.push(i1);
@@ -155,6 +163,7 @@ export const evaluate = (line: string, stack: Stack): Stack => {
                 programCounter = jump;
             } else {
                 console.warn("invalid jump:" + jump);
+                setEnvironment();
                 return saved;
             }
         }
@@ -163,7 +172,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_INDEX: {
         const index = loopCountStack[loopCountStack.length - 1];
         if (index === undefined) {
-          console.warn("not inside of loop\n");
+          console.warn("not inside of loop");
+          setEnvironment();
           return saved;
         }
         stack.push(index);
@@ -180,17 +190,15 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
-          console.warn(stackToString(stack));
-          console.warn(instruction);
-          console.warn(currentName);
-          console.warn(programCounter);
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
             stack.push(i2 + i1);
         } else if (typeof i1 === "string" || typeof i2 === "string") {
             console.warn("can not add string and infinitenion");
+            setEnvironment();
             return saved;
         } else {
             stack.push(addInfinitenion(i2, i1));
@@ -202,11 +210,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 === "string" || typeof i2 === "string") {
             console.warn("only infinitenion can substract");
+            setEnvironment();
             return saved;
         }
         stack.push(subInfinitenion(i2, i1));
@@ -217,11 +227,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 === "string" || typeof i2 === "string") {
             console.warn("only infinitenion can multiply");
+            setEnvironment();
             return saved;
         }
         stack.push(mulInfinitenion(i2, i1));
@@ -232,16 +244,19 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 === "string" || typeof i2 === "string") {
             console.warn("only infinitenion can divide");
+            setEnvironment();
             return saved;
         }
         const result = divInfinitenion(i2, i1);
         if (result === null) {
-          console.warn("division by zero error!\n");
+          console.warn("division by zero error!");
+          setEnvironment();
           return saved;
         }
         stack.push(result);
@@ -252,11 +267,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 !== "number" || typeof i2 !== "number") {
-          console.warn("not integer mod\n");
+          console.warn("not integer mod");
+          setEnvironment();
           return saved;
         }
         const result = i2 % i1;
@@ -268,21 +285,25 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }if (typeof i2 === "string") {
             console.warn("only infinitenion can exponent");
+            setEnvironment();
             return saved;
         }
         if (typeof i1 === "number" && isInteger(i1)) {
           const result = powInfinitenion(i2, i1);
           if (result === null) {
-            console.warn("division by zero error!\n");
+            console.warn("division by zero error!");
+            setEnvironment();
             return saved;
           }
           stack.push(result);
         } else {
-          console.warn(`non integer index: ${i1}\n`);
+          console.warn(`non integer index: ${i1}`);
+          setEnvironment();
           return saved;
         }
         programCounter++;
@@ -292,15 +313,15 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
-          console.warn(stackToString(stack));
-          console.warn(instruction);
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 === "string" && typeof i2 === "string") {
             stack.push(i1 === i2 ? 1 : 0);
         } else if (typeof i1 === "string" || typeof i2 === "string") {
             console.warn("can not compare infinitenion and string");
+            setEnvironment();
             return saved;
         } else {
             stack.push(equalInfinitenion(i1, i2));
@@ -312,13 +333,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
-          console.warn(stackToString(stack));
-          console.warn(instruction);
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 !== "number" || typeof i2 !== "number") {
-          console.warn("not integer\n");
+          console.warn("not integer2");
+          setEnvironment();
           return saved;
         }
         const result = i2 <= i1 ? 1 : 0;
@@ -330,11 +351,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 !== "number" || typeof i2 !== "number") {
-          console.warn("not integer\n");
+          setEnvironment();
+          console.warn("not integer");
           return saved;
         }
         const result = i2 < i1 ? 1 : 0;
@@ -346,11 +369,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 !== "number" || typeof i2 !== "number") {
-          console.warn("not integer\n");
+          console.warn("not integer");
+          setEnvironment();
           return saved;
         }
         const result = i2 >= i1 ? 1 : 0;
@@ -362,11 +387,13 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof i1 !== "number" || typeof i2 !== "number") {
-          console.warn("not integer\n");
+          console.warn("not integer");
+          setEnvironment();
           return saved;
         }
         const result = i2 > i1 ? 1 : 0;
@@ -377,9 +404,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_DUP: {
         const i1 = stack[stack.length - 1];
         if (i1 === undefined) {
-          console.warn("stack underflow!\n");
-          console.warn(stackToString(stack));
-          console.warn(instruction);
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         stack.push(i1);
@@ -395,9 +421,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i1 = stack.pop();
         const i2 = stack.pop();
         if (i1 === undefined || i2 === undefined) {
-          console.warn("stack underflow!\n");
-          console.warn(stackToString(stack));
-          console.warn(instruction);
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         stack.push(i1);
@@ -410,7 +435,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i2 = stack.pop();
         const i3 = stack.pop();
         if (i1 === undefined || i2 === undefined || i3 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         stack.push(i2);
@@ -424,7 +450,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         const i2 = stack.pop();
         const i3 = stack.pop();
         if (i1 === undefined || i2 === undefined || i3 === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         stack.push(i1);
@@ -436,9 +463,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_OVER: {
         const item = stack[stack.length - 2];
         if (item === undefined) {
-          console.warn("stack underflow!\n");
-          console.warn(stackToString(stack));
-          console.warn(instruction);
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         stack.push(item);
@@ -458,13 +484,15 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_IMAGINARY: {
         const n = stack.pop();
         if (n === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof n === "number" && isNonNegativeInteger(n)) {
           stack.push(nthImaginary(n));
         } else {
-          console.warn(`invalid imaginary index: ${n}\n`);
+          console.warn(`invalid imaginary index: ${n}`);
+          setEnvironment();
           return saved;
         }
         programCounter++;
@@ -473,7 +501,8 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_PRINT: {
         const n = stack.pop();
         if (n === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
         if (typeof n === "string") {
@@ -487,36 +516,56 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_BIND: {
         const n = stack.pop();
         if (n === undefined) {
-          console.warn("stack underflow!\n");
+          console.warn("stack underflow!");
+          setEnvironment();
           return saved;
         }
-        const name = currentInstructions[programCounter + 1];
-        if (typeof name !== "string") {
+        const word = currentInstructions[programCounter + 1];
+        if (typeof word !== "string") {
           console.warn("invalid state");
+          setEnvironment();
+          return saved;
+        }
+        const environment = findEnvironment(word);
+        if (environment === null) { // 正しく実装されてればコンパイル時にチェック済み
+          console.warn("invalid state! undefined word:" + word);
+          setEnvironment();
           return saved;
         }
         if (typeof n === "string") {
-          environment[name] = {type: "String", value: n};
+          environment.values[word] = {type: "String", value: n};
         } else {
-          environment[name] = {type: "Infinitenion", value: n}
+          environment.values[word] = {type: "Infinitenion", value: n}
         }
         programCounter += 2;
         break;
       }
       case CODE_CALL: {
-        const name = currentInstructions[programCounter + 1];
-        if (typeof name !== "string") {
+        const word = currentInstructions[programCounter + 1];
+        if (typeof word !== "string") {
           console.warn("invalid state");
           return saved;
         }
-        const value = environment[name];
-        if (value === undefined) {
-          console.warn("undefined variable:" + name);
+        const environment = findEnvironment(word);
+        if (environment === null) { // 正しく実装されてればコンパイル時にチェック済み（いや、そんなことないかも！ ローカル変数を定義する前にアクセスしたら起こる）
+          console.warn("invalid state! undefined word:" + word);
+          setEnvironment();
+          return saved;
+        }
+        const value = environment.values[word];
+        if (value === undefined) { // TODO 本当はこのチェックは上でやったことと同じなのでいらないはず
+          console.warn("invalid state! undefined word!:" + word);
+          setEnvironment();
           return saved;
         }
         if (value.type === "Executable") {
           callStack.push({name: currentName, programCounter});
-          currentName = name;
+          currentName = word;
+          const newEnvironment: Environment = {
+            parent: currentEnvironment,
+            values: {...environment.values}
+          };
+          setEnvironment(newEnvironment);
           programCounter = 0;
         } else {
           stack.push(value.value);
@@ -527,10 +576,18 @@ export const evaluate = (line: string, stack: Stack): Stack => {
       case CODE_RETURN: {
         const callData = callStack.pop();
         if (callData === undefined) {
-          console.warn("invalid state");
+          console.warn("invalid state: call data");
+          setEnvironment();
           return saved;
         }
         currentName = callData.name;
+        const parent = currentEnvironment.parent;
+        if (parent === null) {
+          console.warn("invalid state! no parent environment");
+          setEnvironment();
+          return saved;
+        }
+        setEnvironment(parent);
         programCounter = callData.programCounter + 2;
         break;
       } 
@@ -538,7 +595,9 @@ export const evaluate = (line: string, stack: Stack): Stack => {
         return stack;
       case CODE_PLACEFOLDER:
       default: {
+        console.warn(currentEnvironment);
         console.warn(`invalid state: ${instructions}`);
+        setEnvironment();
         return saved;
       }
     }

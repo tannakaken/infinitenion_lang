@@ -43,10 +43,17 @@ type WordResult = {
   type: "Word";
   value: string;
 };
+type BindResult = {
+  type: "Bind";
+  value: string;
+}
 
 type FunctionResult = {
   type: "Function";
   value: string;
+};
+type FunctionEndResult = {
+  type: "FunctionEnd";
 };
 type VariableResult = {
   type: "Variable";
@@ -81,7 +88,6 @@ const OPERATORS = [
   "e",
   "i",
   ".",
-  ";",
 ] as const;
 type Operator = (typeof OPERATORS)[number];
 /**
@@ -99,7 +105,7 @@ const OPERATOR_RESULTS = OPERATORS.reduce((acc, value) => {
 /**
  * 成功
  */
-export type SuccessResult = IntegerResult | FloatResult | StringResult | WordResult | FunctionResult | VariableResult | OperatorResult;
+export type SuccessResult = IntegerResult | FloatResult | StringResult | WordResult | BindResult | FunctionResult | FunctionEndResult | VariableResult | OperatorResult;
 export type Result = NullResult | SuccessResult;
 /**
  * 文字列をパースして結果と残りの文字列を返す関数
@@ -156,6 +162,7 @@ export const stringParser: Parser = (line) => {
 
 type ExcecutableValue = {
   type: "Executable",
+  environment: Environment,
   value: Instruction[],
 };
 type InfinitenionValue = {
@@ -168,12 +175,32 @@ type StringValue = {
 };
 
 type Value = ExcecutableValue | InfinitenionValue | StringValue | undefined;
-type Environment = {[key: string]: Value};
-export let environment: Environment = {};
+type Values = {[key: string]: Value};
+export type Environment = {
+  parent: Environment | null;
+  values: Values;
+}
+let rootEnvironment: Environment = {
+  parent: null,
+  values: {},
+};
+export let currentEnvironment = rootEnvironment;
+export const setEnvironment = (newEnvironment = rootEnvironment) => {
+  currentEnvironment = newEnvironment;
+}
+export const findEnvironment = (word: string, root = currentEnvironment): Environment | null => {
+  if (word in root.values) {
+    return root;
+  }
+  if (root.parent !== null) {
+    return findEnvironment(word, root.parent); 
+  }
+  return null;
+}
 
 export const wordParser: Parser = (line) => {
   const word = line.split(/\s+/, 1)[0];
-  if (word in environment) {
+  if (findEnvironment(word) !== null) {
     return [{type: "Word", value: word}, line.substring(word.length)];
   }
   return [NULL_RESULT, line];
@@ -194,31 +221,73 @@ export const functionParser: Parser = (line) => {
   if ((OPERATORS as readonly string[]).includes(word)) { // 組み込み演算子の上書きはいけない。
     return [NULL_RESULT, line];
   }
-  if (!(word in environment)) {
-    environment[word] = undefined;
-  }
+  const newEnvironment = {
+    parent: currentEnvironment,
+    values: {}
+  };
+  currentEnvironment.values[word] = {
+    type: "Executable",
+    environment: newEnvironment,
+    value: []
+  };
+  currentEnvironment = newEnvironment;
   return [{type: "Function", value: word}, trimmed.substring(word.length)];
 }
 
-export const variableParser: Parser = (line) => {
-  if (!line.startsWith("!")) {
+export const functionEndParser: Parser = (line) => {
+  if (!line.startsWith(";")) {
     return [NULL_RESULT, line];
   }
-  const trimmed = line.substring(1).trim();
+  const environment = currentEnvironment.parent;
+  if (environment === null) {
+    console.warn("function not start");
+    currentEnvironment = rootEnvironment;
+    return [NULL_RESULT, line];
+  }
+  currentEnvironment = environment;
+  return [{type: "FunctionEnd"}, line.substring(1)];
+}
+
+export const variableParser: Parser = (line) => {
+  if (!line.startsWith("var ")) {
+    return [NULL_RESULT, line];
+  }
+  const trimmed = line.substring(4).trim();
   const word = trimmed.split(/\s+/, 1)[0];
   if (word === undefined) {
     return [NULL_RESULT, line];
   }
   if (numberParser(word)[1] === "") { // 数字として読めるのはいけない。
+    console.warn("cannnot override number");
     return [NULL_RESULT, line];
   }
   if ((OPERATORS as readonly string[]).includes(word)) { // 組み込み演算子の上書きはいけない。
+    console.warn("cannnot override operator");
     return [NULL_RESULT, line];
   }
-  if (!(word in environment)) {
-    environment[word] = undefined;
+  if (word === "var" || word === "!" || word === ":" || word === ";") {
+    console.warn("cannnot override operator");
+    return [NULL_RESULT, line];
+  }
+  if (findEnvironment(word) === null) {
+    rootEnvironment.values[word] = undefined;
   }
   return [{type: "Variable", value: word}, trimmed.substring(word.length)];
+}
+
+export const bindParser: Parser = (line) => {
+  if (!line.startsWith("!")) {
+    return [NULL_RESULT, line];
+  }
+  const trimmed = line.substring(1).trim()
+  const word = trimmed.split(/\s+/, 1)[0];
+  if (word === undefined) {
+    return [NULL_RESULT, line];
+  }
+  if (findEnvironment(word) !== null) {
+    return [{type: "Bind", value: word}, trimmed.substring(word.length)];
+  }
+  return [NULL_RESULT, line];
 }
 
 /**
@@ -261,7 +330,7 @@ export const operatorsParser = makeOrParser(OPERATOR_PARSERS);
 /**
  * まずワード、次に数、その後文字列、そして演算子、最後に新しいワードを取得しようとするパーサー
  */
-export const tokenParser = makeOrParser([wordParser, numberParser, stringParser, operatorsParser, functionParser, variableParser]);
+export const tokenParser = makeOrParser([numberParser, stringParser, functionEndParser, bindParser, functionParser, variableParser, wordParser, operatorsParser]);
 
 type ArrayResylt = SuccessResult[] | null;
 
@@ -277,7 +346,7 @@ export const makeArrayParser = (
     if (trimmed.length === 0) {
       return [];
     }
-    const [result, rest] = parser(line.trim());
+    const [result, rest] = parser(trimmed);
     if (result.type === "Null") {
       console.warn("error before:" + rest);
       return null;
@@ -327,7 +396,7 @@ export const CODE_OVER = -26;
 export const CODE_CLEAR = -27;
 export const CODE_CR = -28;
 export const CODE_CALL = -29;
-export const CODE_BIND = -30
+export const CODE_BIND = -30;
 export const CODE_RETURN = -31;
 export const CODE_PLACEFOLDER = -32;
 
@@ -343,13 +412,13 @@ export const resolveCurrentInstructions = (currentWord: string | null, instructi
   if (currentWord === null) {
     return instructions;
   }
-  const currentInstructions = environment[currentWord];
+  const currentInstructions = currentEnvironment.values[currentWord];
   if (currentInstructions === undefined) {
-      console.warn("Invalid State");
+      console.warn("Invalid State: instructions undefined");
       return null;
   }
   if (currentInstructions.type === "Infinitenion" || currentInstructions.type === "String") {
-      console.warn("Invalid State");
+      console.warn("Invalid State: not instructions");
       return null;
   }
   return currentInstructions.value;
@@ -359,10 +428,16 @@ export const instructionsParser = (
   line: string,
   instructions: (number | string)[]
 ): Instruction[] | null => {
-  const savedWords = {...environment};
+  const savedEnvironment: Environment = {
+    parent: null,
+    values: {...rootEnvironment.values}
+  };
   const tokens = tokenizer(line);
   if (tokens === null) {
     console.warn("tokenize failed");
+    branchStack.splice(0);
+    rootEnvironment = savedEnvironment;
+    currentEnvironment = rootEnvironment;
     return null;
   }
   let programCounter = instructions.length;
@@ -370,6 +445,9 @@ export const instructionsParser = (
   for (const token of tokens) {
     const currentInstructions = resolveCurrentInstructions(currentWord, instructions);
     if (currentInstructions === null) {
+      branchStack.splice(0);
+      rootEnvironment = savedEnvironment;
+      currentEnvironment = rootEnvironment;
       return null;
     }
     switch (token.type) {
@@ -382,7 +460,8 @@ export const instructionsParser = (
       case "Function": {
         if (inBranch()) {
           console.warn("you can define function only at top");
-          environment = savedWords;
+          rootEnvironment = savedEnvironment;
+          branchStack.splice(0);
           return null;
         }
         branchStack.push(programCounter);
@@ -391,12 +470,27 @@ export const instructionsParser = (
         currentWord = word;
         break;
       }
-      case "Variable": {
-        if (inBranch()) {
-          console.warn("you can define variable only at top");
-          environment = savedWords;
+      case "FunctionEnd": {
+        const idx = branchStack.pop();
+        if (idx === undefined) {
+          console.warn("not inside function block");
+          rootEnvironment = savedEnvironment;
+          branchStack.splice(0);
           return null;
         }
+        if (inBranch()) {
+          console.warn("unclosed if block or do loop");
+          rootEnvironment = savedEnvironment;
+          branchStack.splice(0);
+          return null;
+        }
+        currentInstructions.push(CODE_RETURN);
+        programCounter = idx; 
+        currentWord = null;
+        break;
+      }
+      case "Bind":
+      case "Variable": {
         currentInstructions.push(CODE_BIND);
         currentInstructions.push(token.value);
         programCounter += 2;
@@ -421,7 +515,8 @@ export const instructionsParser = (
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside if block");
-              environment = savedWords;
+              rootEnvironment = savedEnvironment;
+              branchStack.splice(0);
               return null;
             }
             currentInstructions.push(CODE_ELSE);
@@ -435,7 +530,8 @@ export const instructionsParser = (
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside if block");
-              environment = savedWords;
+              rootEnvironment = savedEnvironment;
+              branchStack.splice(0);
               return null;
             }
             currentInstructions.push(CODE_THEN);
@@ -449,11 +545,12 @@ export const instructionsParser = (
             programCounter++;
             break;
           }
-          case "loop": {            
+          case "loop": {      
             const idx = branchStack.pop();
             if (idx === undefined) {
               console.warn("not inside do loop");
-              environment = savedWords;
+              rootEnvironment = savedEnvironment;
+              branchStack.splice(0);
               return null;
             }
             currentInstructions.push(CODE_LOOP);
@@ -570,27 +667,12 @@ export const instructionsParser = (
             currentInstructions.push(CODE_IMAGINARY);
             programCounter++;
             break;
-          }
-          case ";": {
-            const idx = branchStack.pop();
-            if (idx === undefined) {
-              console.warn("not inside function block");
-              environment = savedWords;
-              return null;
-            }
-            if (inBranch()) {
-              console.warn("unclosed if block or do loop");
-              environment = savedWords;
-              return null;
-            }
-            currentInstructions.push(CODE_RETURN);
-            programCounter = idx; 
-            currentWord = null;
-            break;
-          }          
+          }  
         }
     }
   }
-  instructions.push(CODE_END);
+  if (!inBranch()) {
+    instructions.push(CODE_END);
+  }
   return instructions;
 };
