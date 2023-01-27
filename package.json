@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "repository": "https://github.com/tannakaken/infinitenion_lang.git",
   "author": "tannakaken <tannakaken@gmail.com>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "scripts": {
     "dev": "ts-node repl.ts",
